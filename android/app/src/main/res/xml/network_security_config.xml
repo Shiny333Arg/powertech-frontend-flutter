@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9+ bloquea HTTP en texto plano. Laravel en desarrollo corre en
+  http://, asi que hay que permitirlo EXPLICITAMENTE y solo para los hosts
+  de desarrollo. La app de produccion sigue exigiendo HTTPS.
+
+  10.0.2.2  = el "localhost" de la PC visto desde el emulador de Android
+  127.0.0.1 = localhost dentro del propio emulador
+  192.168.x = agrega aca la IP LAN de tu PC si vas a probar en el telefono
+              real (hay que escribirla entera, no acepta comodines)
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- <domain includeSubdomains="true">192.168.0.15</domain> -->
+    </domain-config>
+</network-security-config>

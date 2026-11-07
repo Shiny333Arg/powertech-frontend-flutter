@@ -1,0 +1,41 @@
+name: powertech_tienda
+description: "PowerTech - app cliente de la tienda online."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  # go_router 18.x exige Dart ^3.12.0 / Flutter >=3.44.0.
+  # Si tu Flutter es mas viejo: 'flutter upgrade', o ver la nota del paso 0.
+  sdk: ^3.12.0
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Estado
+  flutter_riverpod: ^3.4.3
+
+  # HTTP (interceptores: token, logging, mapeo de errores)
+  dio: ^5.11.1
+
+  # Token Sanctum en almacenamiento cifrado del SO
+  flutter_secure_storage: ^11.2.0
+
+  # Navegacion declarativa con redirect por estado de sesion
+  go_router: ^18.1.3
+
+  # Formato de precios en es-AR ($ 1.234,56) y fechas
+  intl: ^0.20.3
+
+  # Abrir el init_point de Mercado Pago en el navegador del sistema.
+  # Las credenciales de MP NO viven en Flutter: solo se abre la URL.
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
