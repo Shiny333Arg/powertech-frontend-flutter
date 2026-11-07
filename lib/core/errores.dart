@@ -61,7 +61,23 @@ class ErrorValidacion extends ErrorApi {
   }
 }
 
-/// Cualquier otro codigo HTTP de error (500, 503, 429...).
+/// 429. El throttle por IP de `routes/api.php` cortó la llamada.
+///
+/// No confundir con el de cinco intentos por correo + IP que vive en
+/// `LoginMovilRequest`: ese sale como 422 sobre el campo `email`, con el
+/// texto de `auth.throttle` ya en castellano, y se muestra debajo del campo
+/// como cualquier otro error de validacion. Este es el de afuera, el que
+/// cuenta llamadas por minuto sin mirar de quien son, y Laravel lo contesta
+/// en ingles: por eso el mensaje se arma aca.
+///
+/// `segundos` sale de la cabecera `Retry-After` cuando el servidor la manda.
+class ErrorDemasiadosIntentos extends ErrorApi {
+  const ErrorDemasiadosIntentos(super.mensaje, {this.segundos});
+
+  final int? segundos;
+}
+
+/// Cualquier otro codigo HTTP de error (500, 502, 503...).
 class ErrorServidor extends ErrorApi {
   const ErrorServidor(super.mensaje, this.codigo);
 
@@ -131,9 +147,34 @@ ErrorApi _mapearRespuesta(Response<dynamic>? respuesta) {
       return ErrorNoEncontrado(mensaje);
     case 422:
       return ErrorValidacion(mensaje, _extraerErrores(cuerpo));
+    case 429:
+      return _mapearDemasiadosIntentos(respuesta);
     default:
       return ErrorServidor(mensaje, codigo);
   }
+}
+
+/// El mensaje de Laravel para el 429 es "Too Many Attempts.", asi que no se
+/// reutiliza: se arma uno en castellano con los segundos de `Retry-After`.
+ErrorApi _mapearDemasiadosIntentos(Response<dynamic>? respuesta) {
+  final segundos = int.tryParse(
+    respuesta?.headers.value('retry-after')?.trim() ?? '',
+  );
+
+  if (segundos == null || segundos <= 0) {
+    return const ErrorDemasiadosIntentos(
+      'Hiciste demasiados intentos seguidos. Esperá un momento y probá de nuevo.',
+    );
+  }
+
+  final espera = segundos < 60
+      ? '$segundos segundos'
+      : '${(segundos / 60).ceil()} minutos';
+
+  return ErrorDemasiadosIntentos(
+    'Hiciste demasiados intentos seguidos. Probá de nuevo en $espera.',
+    segundos: segundos,
+  );
 }
 
 Map<String, List<String>> _extraerErrores(dynamic cuerpo) {
