@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errores.dart';
+import '../../datos/modelos/filtros_catalogo.dart';
+import '../../datos/modelos/promocion.dart';
 import '../../datos/modelos/vitrina.dart';
 import '../../estado/catalogo_providers.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/carrusel_promociones.dart';
-import '../widgets/tarjeta_producto.dart';
+import '../widgets/grilla_productos.dart';
+import 'pantalla_catalogo.dart';
 import 'pantalla_diagnostico.dart';
 import 'pantalla_inicio.dart';
 import 'pantalla_login.dart';
@@ -35,6 +38,12 @@ class PantallaVitrina extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('PowerTech'),
         actions: [
+          IconButton(
+            tooltip: 'Buscar en el catálogo',
+            icon: const Icon(Icons.search),
+            onPressed: () => _irAlCatalogo(context),
+          ),
+
           IconButton(
             tooltip: 'Diagnóstico de conexión',
             icon: const Icon(Icons.wifi_tethering),
@@ -78,6 +87,9 @@ class PantallaVitrina extends ConsumerWidget {
               vitrina: datos,
               esInvitado: usuario == null,
               onIngresar: () => _irAlLogin(context),
+              onVerCatalogo: () => _irAlCatalogo(context),
+              onTocarPromocion: (promocion) =>
+                  _irAlCatalogo(context, promocion: promocion),
             ),
           ),
         ),
@@ -90,6 +102,29 @@ class PantallaVitrina extends ConsumerWidget {
       MaterialPageRoute<void>(builder: (_) => const PantallaLogin()),
     );
   }
+
+  /// Abre el catálogo, opcionalmente filtrado por una promoción.
+  ///
+  /// **Es lo que el paso 3 dejó preparado con `onTocar: null`.** El filtro
+  /// viaja como `?promocion={id}` y el backend devuelve el objeto `promocion`
+  /// en la respuesta, que es lo que el catálogo usa para titular la lista con
+  /// el nombre del banner que el cliente tocó.
+  ///
+  /// Si la promoción venció entre que se dibujó el banner y que se tocó,
+  /// `promocionDelFiltro()` devuelve null, el controlador descarta el filtro y
+  /// la app muestra el catálogo completo en lugar de una lista vacía. No hay
+  /// nada que manejar acá: ya está resuelto del lado del servidor.
+  void _irAlCatalogo(BuildContext context, {Promocion? promocion}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PantallaCatalogo(
+          filtrosIniciales: promocion == null
+              ? null
+              : FiltrosCatalogo(promocionId: promocion.id),
+        ),
+      ),
+    );
+  }
 }
 
 class _Contenido extends StatelessWidget {
@@ -97,11 +132,15 @@ class _Contenido extends StatelessWidget {
     required this.vitrina,
     required this.esInvitado,
     required this.onIngresar,
+    required this.onVerCatalogo,
+    required this.onTocarPromocion,
   });
 
   final Vitrina vitrina;
   final bool esInvitado;
   final VoidCallback onIngresar;
+  final VoidCallback onVerCatalogo;
+  final void Function(Promocion) onTocarPromocion;
 
   @override
   Widget build(BuildContext context) {
@@ -127,61 +166,36 @@ class _Contenido extends StatelessWidget {
 
         if (vitrina.promociones.isNotEmpty) ...[
           const _TituloSeccion('Promociones'),
-          // El salto al catálogo filtrado por promoción es el paso 4: hasta
-          // entonces el banner no es tocable.
-          CarruselPromociones(promociones: vitrina.promociones),
+          // Desde el paso 4 el banner lleva al catálogo filtrado por esa
+          // promoción: `?promocion={id}`.
+          CarruselPromociones(
+            promociones: vitrina.promociones,
+            onTocar: onTocarPromocion,
+          ),
           const SizedBox(height: 8),
         ],
 
         for (final seccion in secciones) ...[
           _TituloSeccion(seccion.titulo),
-          _GrillaProductos(
-            seccion: seccion,
-            esInvitado: esInvitado,
-            onIngresar: onIngresar,
+          GrillaProductos(
+            productos: seccion.productos,
+            onIngresar: esInvitado ? onIngresar : null,
+            // La ficha de producto es el paso 5.
+            onTocarProducto: null,
           ),
         ],
+
+        const SizedBox(height: 28),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: OutlinedButton.icon(
+            onPressed: onVerCatalogo,
+            icon: const Icon(Icons.grid_view_outlined),
+            label: const Text('Ver todo el catálogo'),
+          ),
+        ),
       ],
-    );
-  }
-}
-
-class _GrillaProductos extends StatelessWidget {
-  const _GrillaProductos({
-    required this.seccion,
-    required this.esInvitado,
-    required this.onIngresar,
-  });
-
-  final SeccionVitrina seccion;
-  final bool esInvitado;
-  final VoidCallback onIngresar;
-
-  @override
-  Widget build(BuildContext context) {
-    // Dos columnas en teléfono, más en pantallas grandes. La tarjeta sin
-    // precio es más baja que la que lo tiene, así que la relación de aspecto
-    // se calcula con la más alta: si no, la tarjeta con descuento desborda.
-    final ancho = MediaQuery.sizeOf(context).width;
-    final columnas = ancho >= 900 ? 4 : (ancho >= 600 ? 3 : 2);
-
-    return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columnas,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.62,
-      ),
-      itemCount: seccion.productos.length,
-      itemBuilder: (context, i) => TarjetaProducto(
-        producto: seccion.productos[i],
-        onIngresar: esInvitado ? onIngresar : null,
-        // La ficha de producto es el paso 5.
-        onTocar: null,
-      ),
     );
   }
 }

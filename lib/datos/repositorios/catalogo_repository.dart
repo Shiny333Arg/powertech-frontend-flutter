@@ -2,6 +2,8 @@ import '../../core/api_client.dart';
 import '../../core/errores.dart';
 import '../modelos/categoria.dart';
 import '../modelos/conversiones.dart';
+import '../modelos/filtros_catalogo.dart';
+import '../modelos/resultado_catalogo.dart';
 import '../modelos/vitrina.dart';
 
 /// Acceso al catalogo publico. Todas estas rutas aceptan token pero no lo
@@ -54,6 +56,59 @@ class CatalogoRepository {
     return (cuerpo['data'] as List)
         .whereType<Map>()
         .map((fila) => Categoria.fromJson(Map<String, dynamic>.from(fila)))
+        .toList();
+  }
+
+  /// GET /productos -> data + links + meta + filtros + promocion + ordenes
+  ///
+  /// `pagina` se manda como `?page=N` junto con los mismos filtros, y no se
+  /// sigue el `links.next` de la respuesta: esas URL las arma Laravel con el
+  /// host del request y seguirlas ataria la paginacion a ese host. El backend
+  /// usa `withQueryString()`, asi que de todos modos hay que reenviar los
+  /// filtros para que la pagina 2 no devuelva el catalogo entero.
+  Future<ResultadoCatalogo> buscar(
+    FiltrosCatalogo filtros, {
+    int pagina = 1,
+  }) async {
+    final respuesta = await _api.enviar(
+      (dio) => dio.get(
+        '/productos',
+        queryParameters: filtros.aQueryString(pagina: pagina),
+      ),
+    );
+
+    final cuerpo = comoMapa(respuesta.data);
+
+    if (cuerpo == null || cuerpo['data'] is! List) {
+      throw ErrorFormato(
+        'La respuesta de /productos no tiene la clave "data" con una lista. '
+        'Llego: ${_recorte(respuesta.data)}',
+      );
+    }
+
+    return ResultadoCatalogo.fromJson(cuerpo);
+  }
+
+  /// GET /marcas -> { data: ["AMD", "Corsair", ...] }
+  ///
+  /// Texto libre, no una tabla: el backend lo saca con `distinct()` sobre la
+  /// columna `marca` de los productos publicados, asi que viaja como lista de
+  /// cadenas y no como recurso con id.
+  Future<List<String>> marcas() async {
+    final respuesta = await _api.enviar((dio) => dio.get('/marcas'));
+
+    final cuerpo = comoMapa(respuesta.data);
+
+    if (cuerpo == null || cuerpo['data'] is! List) {
+      throw ErrorFormato(
+        'La respuesta de /marcas no tiene la clave "data" con una lista. '
+        'Llego: ${_recorte(respuesta.data)}',
+      );
+    }
+
+    return (cuerpo['data'] as List)
+        .map(comoTextoOpcional)
+        .whereType<String>()
         .toList();
   }
 }
