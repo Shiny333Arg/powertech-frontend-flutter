@@ -6,13 +6,73 @@ import '../../core/errores.dart';
 import '../../datos/modelos/categoria.dart';
 import '../../estado/catalogo_providers.dart';
 
+
+
+
+
+import '../../core/api_client.dart';
+import '../../core/almacenamiento.dart';
+
 /// Pantalla temporal del paso 0: prueba de conectividad contra
 /// `GET /api/v1/categorias`. Se borra en cuanto exista la vitrina real.
-class PantallaDiagnostico extends ConsumerWidget {
+class PantallaDiagnostico extends ConsumerStatefulWidget {
   const PantallaDiagnostico({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PantallaDiagnostico> createState() =>
+      _PantallaDiagnosticoState();
+}
+
+class _PantallaDiagnosticoState
+    extends ConsumerState<PantallaDiagnostico> {
+  bool _probandoValidacion = false;
+  String? _resultadoValidacion;
+
+  Future<void> _probarValidacion() async {
+    setState(() {
+      _probandoValidacion = true;
+      _resultadoValidacion = null;
+    });
+
+    try {
+      final api = ApiClient(almacen: AlmacenSeguro());
+
+      await api.enviar(
+            (dio) => dio.post('/auth/registro', data: {}),
+      );
+
+      setState(() {
+        _resultadoValidacion =
+        'La solicitud respondió sin errores. Se esperaba un 422.';
+      });
+    } on ErrorValidacion catch (e) {
+      final errores = e.errores;
+      final email = e.primeroDe('email');
+
+      setState(() {
+        _resultadoValidacion =
+        '¡Prueba exitosa! Laravel respondió con un 422 '
+            'y la app lo convirtió en ErrorValidacion.\n\n'
+            'Cantidad de campos con errores: ${errores.length}\n'
+            'Error de email: ${email ?? "No informado"}\n\n'
+            'Detalle:\n${errores.entries.map((entry) => "${entry.key}: ${entry.value.join(", ")}").join("\n")}';
+      });
+    } catch (e) {
+      setState(() {
+        _resultadoValidacion =
+        'La prueba no produjo un ErrorValidacion.\n\n$e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _probandoValidacion = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final categorias = ref.watch(categoriasProvider);
 
     return Scaffold(
@@ -30,6 +90,32 @@ class PantallaDiagnostico extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _TarjetaConfig(),
+
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: FilledButton.icon(
+              onPressed: _probandoValidacion ? null : _probarValidacion,
+              icon: _probandoValidacion
+                  ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+                  : const Icon(Icons.fact_check),
+              label: Text(
+                _probandoValidacion
+                    ? 'Probando validación...'
+                    : 'Probar errores de validación (422)',
+              ),
+            ),
+          ),
+
+          if (_resultadoValidacion != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SelectableText(_resultadoValidacion!),
+            ),
+
           const Divider(height: 1),
           Expanded(
             child: !Config.estaConfigurada
