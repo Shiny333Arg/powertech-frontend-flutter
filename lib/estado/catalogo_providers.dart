@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../datos/modelos/categoria.dart';
+import '../datos/modelos/producto_detalle.dart';
 import '../datos/modelos/vitrina.dart';
 import 'proveedores_core.dart';
 
@@ -25,4 +26,21 @@ final categoriasProvider = FutureProvider<List<Categoria>>((ref) async {
 /// que el backend aborte la compra por diferencia de importe.
 final vitrinaProvider = FutureProvider<Vitrina>((ref) async {
   return ref.watch(catalogoRepositoryProvider).home();
+});
+
+/// La ficha de un producto, indexada por su id.
+///
+/// `family` porque la pantalla se puede apilar sobre si misma: desde la ficha
+/// de un producto se entra a la de un relacionado, y cada una necesita su
+/// propia respuesta. Un provider unico haria que la segunda sobreescribiera a
+/// la primera, y al volver atras la ficha anterior mostraria el producto
+/// equivocado.
+///
+/// **Se invalida al iniciar y al cerrar sesion**, igual que la vitrina: la
+/// misma ficha trae el bloque de precio y las promociones aplicadas, o no trae
+/// ninguna de las dos cosas. `ref.invalidate(fichaProvider)` sin argumento
+/// alcanza todas las instancias del family.
+final fichaProvider =
+    FutureProvider.family<ProductoDetalle, int>((ref, productoId) async {
+  return ref.watch(catalogoRepositoryProvider).producto(productoId);
 });

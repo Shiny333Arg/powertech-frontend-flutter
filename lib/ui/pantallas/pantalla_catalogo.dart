@@ -10,6 +10,7 @@ import '../widgets/aviso.dart';
 import '../widgets/grilla_productos.dart';
 import 'pantalla_filtros.dart';
 import 'pantalla_login.dart';
+import 'pantalla_producto.dart';
 
 /// Catálogo paginado: `GET /api/v1/productos`.
 ///
@@ -327,8 +328,7 @@ class _Cuerpo extends ConsumerWidget {
         GrillaProductos(
           productos: estado.productos,
           onIngresar: esInvitado ? onIngresar : null,
-          // La ficha de producto es el paso 5.
-          onTocarProducto: null,
+          onTocarProducto: (producto) => abrirFicha(context, producto),
         ),
 
         const SizedBox(height: 16),

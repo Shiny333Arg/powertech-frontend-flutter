@@ -217,6 +217,12 @@ class SesionNotifier extends Notifier<EstadoSesion> {
   void _invalidarCatalogo() {
     ref.invalidate(categoriasProvider);
     ref.invalidate(vitrinaProvider);
+
+    // Sin argumento alcanza a todas las instancias del family, o sea a la
+    // ficha de cada producto que se haya abierto. Importa porque la ficha
+    // trae el bloque de precio Y la lista de promociones aplicadas: las dos
+    // cosas aparecen o desaparecen juntas con la sesion.
+    ref.invalidate(fichaProvider);
   }
 }
 

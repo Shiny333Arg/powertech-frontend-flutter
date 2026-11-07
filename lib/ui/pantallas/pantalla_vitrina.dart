@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errores.dart';
 import '../../datos/modelos/filtros_catalogo.dart';
+import '../../datos/modelos/producto.dart';
 import '../../datos/modelos/promocion.dart';
 import '../../datos/modelos/vitrina.dart';
 import '../../estado/catalogo_providers.dart';
@@ -14,6 +15,7 @@ import 'pantalla_catalogo.dart';
 import 'pantalla_diagnostico.dart';
 import 'pantalla_inicio.dart';
 import 'pantalla_login.dart';
+import 'pantalla_producto.dart';
 
 /// La vitrina: `GET /api/v1/home`.
 ///
@@ -90,6 +92,7 @@ class PantallaVitrina extends ConsumerWidget {
               onVerCatalogo: () => _irAlCatalogo(context),
               onTocarPromocion: (promocion) =>
                   _irAlCatalogo(context, promocion: promocion),
+              onTocarProducto: (producto) => abrirFicha(context, producto),
             ),
           ),
         ),
@@ -134,6 +137,7 @@ class _Contenido extends StatelessWidget {
     required this.onIngresar,
     required this.onVerCatalogo,
     required this.onTocarPromocion,
+    required this.onTocarProducto,
   });
 
   final Vitrina vitrina;
@@ -141,6 +145,7 @@ class _Contenido extends StatelessWidget {
   final VoidCallback onIngresar;
   final VoidCallback onVerCatalogo;
   final void Function(Promocion) onTocarPromocion;
+  final void Function(Producto) onTocarProducto;
 
   @override
   Widget build(BuildContext context) {
@@ -180,8 +185,7 @@ class _Contenido extends StatelessWidget {
           GrillaProductos(
             productos: seccion.productos,
             onIngresar: esInvitado ? onIngresar : null,
-            // La ficha de producto es el paso 5.
-            onTocarProducto: null,
+            onTocarProducto: onTocarProducto,
           ),
         ],
 

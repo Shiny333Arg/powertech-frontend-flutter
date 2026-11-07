@@ -3,6 +3,7 @@ import '../../core/errores.dart';
 import '../modelos/categoria.dart';
 import '../modelos/conversiones.dart';
 import '../modelos/filtros_catalogo.dart';
+import '../modelos/producto_detalle.dart';
 import '../modelos/resultado_catalogo.dart';
 import '../modelos/vitrina.dart';
 
@@ -87,6 +88,35 @@ class CatalogoRepository {
     }
 
     return ResultadoCatalogo.fromJson(cuerpo);
+  }
+
+  /// GET /productos/{id} -> { data: { ...producto, descripcion, promociones,
+  /// relacionados } }
+  ///
+  /// El controlador devuelve el Resource directo, asi que Laravel lo envuelve
+  /// en `data`, igual que en `/auth/yo`. Se acepta tambien el objeto plano por
+  /// si en algun momento se envuelve distinto: el costo es una linea y evita
+  /// que la ficha entera deje de abrir por un cambio de envoltorio.
+  ///
+  /// **Un 404 llega como [ErrorNoEncontrado]** y significa que el producto se
+  /// despublico o se dio de baja: `show()` hace
+  /// `abort_unless($producto->activo && $producto->publicado_app, 404)`. Es un
+  /// caso real, no un error de programacion: la tarjeta pudo haberse dibujado
+  /// con datos de hace un rato.
+  Future<ProductoDetalle> producto(int id) async {
+    final respuesta = await _api.enviar((dio) => dio.get('/productos/$id'));
+
+    final cuerpo = comoMapa(respuesta.data);
+    final datos = comoMapa(cuerpo?['data']) ?? cuerpo;
+
+    if (datos == null || datos['id'] == null) {
+      throw ErrorFormato(
+        'La respuesta de /productos/$id no trae el producto. '
+        'Llego: ${_recorte(respuesta.data)}',
+      );
+    }
+
+    return ProductoDetalle.fromJson(datos);
   }
 
   /// GET /marcas -> { data: ["AMD", "Corsair", ...] }
