@@ -15,22 +15,24 @@ import 'pantalla_inicio.dart';
 import 'pantalla_login.dart';
 import 'pantalla_producto.dart';
 
+const _fondo = Color(0xFFF5F7FA);
+const _blanco = Colors.white;
+const _texto = Color(0xFF202B3C);
+const _secundario = Color(0xFF64748B);
+const _azul = Color(0xFF2563EB);
+const _borde = Color(0xFFE8EDF3);
+
 /// El carrito: `GET /api/v1/carrito` y sus cuatro operaciones.
 ///
-/// **Cinco estados de pantalla, y el orden en que se preguntan importa:**
+/// Cinco estados de pantalla:
+/// 1. Invitado.
+/// 2. Correo sin verificar.
+/// 3. Cargando.
+/// 4. Error.
+/// 5. Carrito vacío o con líneas.
 ///
-///  1. **Invitado.** No se llama a la API: daría 401. Se invita a ingresar.
-///  2. **Correo sin verificar.** Tampoco se llama: daría 403. `Usuario` trae
-///     `emailVerificado` justamente para poder mostrar la pantalla correcta
-///     *antes* de chocar con el error, en vez de después.
-///  3. **Cargando.**
-///  4. **Error.** Con reintento, salvo que sea un 403 de verificación, que
-///     tiene su propio camino.
-///  5. **El carrito**, vacío o con líneas.
-///
-/// **Nada se calcula acá.** Totales, descuentos, preventa, disponibilidad y
-/// `puede_comprar` llegan resueltos del backend. Lo único que la pantalla
-/// decide es qué dibuja con cada bandera.
+/// Nada se calcula acá. Totales, descuentos, preventa, disponibilidad y
+/// `puede_comprar` llegan resueltos del backend.
 void abrirCarrito(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => const PantallaCarrito()),
@@ -45,33 +47,16 @@ class PantallaCarrito extends ConsumerStatefulWidget {
 }
 
 class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
-  /// Hay una operación en curso.
-  ///
-  /// Bloquea los controles de todas las filas, no solo la tocada: cualquier
-  /// operación devuelve el carrito entero recalculado, así que dos en vuelo
-  /// al mismo tiempo pueden llegar desordenadas y dejar en pantalla el
-  /// resultado de la primera.
+  /// Bloquea los controles mientras se procesa una operación.
   bool _ocupado = false;
 
-  /// Corre una operación del carrito mostrando el resultado al usuario.
-  ///
-  /// Los errores van a un `SnackBar` y **no desarman la lista**: el carrito
-  /// que se está viendo sigue siendo el último válido, y un `+` que no llegó
-  /// no es motivo para vaciar la pantalla.
+  /// Ejecuta una operación del carrito y muestra el resultado.
   Future<void> _operar(
-    Future<void> Function() accion, {
-    String? exito,
-  }) async {
+      Future<void> Function() accion, {
+        String? exito,
+      }) async {
     if (_ocupado) return;
 
-    // **La operación corre esté la pantalla montada o no, pero el setState
-    // no.** `SelectorCantidad` manda su ráfaga pendiente desde `dispose()`,
-    // o sea mientras esta pantalla se desmonta: ahí el cambio de cantidad
-    // tiene que llegar igual al backend —si no, el último toque se pierde en
-    // silencio— pero tocar el estado del widget revienta con "setState()
-    // called after dispose()". El provider vive más que la pantalla, así que
-    // la llamada es segura; lo que no es seguro es el `setState` y el
-    // `SnackBar`.
     final visible = mounted;
 
     if (visible) setState(() => _ocupado = true);
@@ -81,20 +66,13 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
 
       if (mounted && exito != null) _avisar(exito);
     } on ErrorEmailNoVerificado {
-      // El estado local decía que estaba verificado y el backend dice que no.
-      // Se pide /auth/yo de nuevo: el notifier se reconstruye solo con el
-      // usuario nuevo y la pantalla pasa al estado 2.
       if (mounted) {
         _avisar('Necesitás confirmar tu correo para usar el carrito.');
       }
       await ref.read(sesionProvider.notifier).refrescarUsuario();
     } on ErrorValidacion catch (e) {
-      // 422. El caso real es un producto que se despublicó entre que se
-      // dibujó la pantalla y que se tocó el botón.
       if (mounted) _avisar(e.mensaje);
     } on ErrorNoEncontrado {
-      // 404: la línea ya no existe. Pasa si se quitó desde la web en otro
-      // lado. El carrito se recarga para que la pantalla se ponga al día.
       if (mounted) _avisar('Esa línea ya no está en tu carrito.');
       await ref.read(carritoProvider.notifier).recargar();
     } on ErrorApi catch (e) {
@@ -120,54 +98,74 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
     final estado = ref.watch(carritoProvider);
 
     return Scaffold(
+      backgroundColor: _fondo,
       appBar: AppBar(
-        title: const Text('Mi carrito'),
+        backgroundColor: _blanco,
+        foregroundColor: _texto,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Mi carrito',
+          style: TextStyle(
+            color: _texto,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: _borde),
+        ),
         actions: [
-          // Solo cuando hay algo que vaciar. Un botón que no hace nada es
-          // peor que no tenerlo.
           if ((estado.value?.vacio ?? true) == false)
             IconButton(
               tooltip: 'Vaciar carrito',
               icon: const Icon(Icons.delete_sweep_outlined),
+              color: _secundario,
               onPressed: _ocupado ? null : _confirmarVaciado,
             ),
+          const SizedBox(width: 4),
         ],
       ),
-
-      body: SafeArea(child: _cuerpo(usuario, estado)),
+      body: SafeArea(
+        child: _cuerpo(usuario, estado),
+      ),
     );
   }
 
   Widget _cuerpo(Usuario? usuario, AsyncValue<Carrito?> estado) {
-    // Estado 1: invitado. No se pide nada.
+    // Estado 1: invitado.
     if (usuario == null) return const _Invitado();
 
-    // Estado 2: correo sin verificar. Tampoco se pide nada.
+    // Estado 2: correo sin verificar.
     if (!usuario.emailVerificado) return const _SinVerificar();
 
     return estado.when(
-      // Estado 3.
-      loading: () => const Center(child: CircularProgressIndicator()),
+      // Estado 3: cargando.
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: _azul),
+      ),
 
-      // Estado 4.
+      // Estado 4: error.
       error: (e, _) => _Falla(
         error: e,
         onReintentar: () => ref.read(carritoProvider.notifier).recargar(),
       ),
 
-      // Estado 5.
+      // Estado 5: carrito.
       data: (carrito) => _Carrito(
         carrito: carrito ?? Carrito.ninguno,
         ocupado: _ocupado,
         onRecargar: () => ref.read(carritoProvider.notifier).recargar(),
         onCambiarCantidad: (linea, cantidad) => _operar(
-          () => ref.read(carritoProvider.notifier).cambiarCantidad(
-                lineaId: linea.id,
-                cantidad: cantidad,
-              ),
+              () => ref.read(carritoProvider.notifier).cambiarCantidad(
+            lineaId: linea.id,
+            cantidad: cantidad,
+          ),
         ),
         onQuitar: (linea) => _operar(
-          () => ref.read(carritoProvider.notifier).quitar(linea.id),
+              () => ref.read(carritoProvider.notifier).quitar(linea.id),
           exito: 'Quitamos ${linea.nombre} de tu carrito.',
         ),
         onContinuar: _irAlCheckout,
@@ -176,10 +174,6 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
   }
 
   /// Lleva a la revisión previa al pago.
-  ///
-  /// Se apila sobre el carrito, no lo reemplaza: desde el checkout se vuelve
-  /// acá para quitar un producto que bloquea la compra, y volver tiene que
-  /// ser un `pop` y no reconstruir la pantalla.
   void _irAlCheckout() {
     abrirCheckout(context);
   }
@@ -188,16 +182,41 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (contexto) => AlertDialog(
-        title: const Text('¿Vaciar el carrito?'),
+        backgroundColor: _blanco,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          '¿Vaciar el carrito?',
+          style: TextStyle(
+            color: _texto,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         content: const Text(
           'Se van a quitar todos los productos. Esto no se puede deshacer.',
+          style: TextStyle(
+            color: _secundario,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(contexto).pop(false),
-            child: const Text('Cancelar'),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: _secundario),
+            ),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: _azul,
+              foregroundColor: _blanco,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: () => Navigator.of(contexto).pop(true),
             child: const Text('Vaciar'),
           ),
@@ -208,7 +227,7 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
     if (confirmado != true) return;
 
     await _operar(
-      () => ref.read(carritoProvider.notifier).vaciar(),
+          () => ref.read(carritoProvider.notifier).vaciar(),
       exito: 'Vaciamos tu carrito.',
     );
   }
@@ -239,6 +258,7 @@ class _Carrito extends StatelessWidget {
   Widget build(BuildContext context) {
     if (carrito.vacio) {
       return RefreshIndicator(
+        color: _azul,
         onRefresh: onRecargar,
         child: const _Vacio(),
       );
@@ -250,13 +270,15 @@ class _Carrito extends StatelessWidget {
       children: [
         Expanded(
           child: RefreshIndicator(
+            color: _azul,
             onRefresh: onRecargar,
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 16),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 8, bottom: 20),
               children: [
                 if (noDisponibles > 0)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: AvisoInformativo(
                       titulo: noDisponibles == 1
                           ? 'Un producto ya no está disponible'
@@ -278,17 +300,33 @@ class _Carrito extends StatelessWidget {
                         ? null
                         : () => abrirFicha(context, linea.producto!),
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: _borde,
+                  ),
                 ],
               ],
             ),
           ),
         ),
 
-        ResumenCarrito(
-          carrito: carrito,
-          ocupado: ocupado,
-          onContinuar: onContinuar,
+        // El resumen permanece fijo debajo de la lista.
+        Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: _blanco,
+            border: Border(
+              top: BorderSide(color: _borde, width: 1),
+            ),
+          ),
+          child: ResumenCarrito(
+            carrito: carrito,
+            ocupado: ocupado,
+            onContinuar: onContinuar,
+          ),
         ),
       ],
     );
@@ -304,11 +342,11 @@ class _Vacio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ListView y no Column: el RefreshIndicator necesita algo desplazable
-    // para poder tirar hacia abajo.
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.15),
         const _Mensaje(
           icono: Icons.shopping_cart_outlined,
           titulo: 'Tu carrito está vacío',
@@ -320,29 +358,47 @@ class _Vacio extends StatelessWidget {
   }
 }
 
-/// Estado 1. El carrito exige sesión, así que no hay nada que pedir.
+/// Estado 1: el carrito exige sesión.
 class _Invitado extends StatelessWidget {
   const _Invitado();
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.14),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.12),
         const _Mensaje(
           icono: Icons.lock_outline,
           titulo: 'Ingresá para usar el carrito',
           detalle: 'El carrito es de tu cuenta: ahí guardamos lo que elegiste '
               'aunque cierres la app.',
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 28),
         Center(
-          child: FilledButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const PantallaLogin()),
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _azul,
+              foregroundColor: _blanco,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 28,
+                vertical: 14,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(13),
+              ),
             ),
-            child: const Text('Ingresar'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PantallaLogin(),
+              ),
+            ),
+            icon: const Icon(Icons.login_rounded, size: 19),
+            label: const Text(
+              'Ingresar',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ],
@@ -350,15 +406,7 @@ class _Invitado extends StatelessWidget {
   }
 }
 
-/// Estado 2. El token sirve, falta confirmar el correo.
-///
-/// **No se llama a la API para descubrirlo.** El backend respondería 403 con
-/// `codigo: "email_no_verificado"`, pero `Usuario.emailVerificado` ya lo dice
-/// sin gastar una llamada que sabemos que falla.
-///
-/// El botón de reenvío no se duplica acá: ya vive en "Mi cuenta", junto al
-/// resto de los avisos de la cuenta, y tener dos lugares desde donde reenviar
-/// el mismo correo complica el throttle de seis por minuto del backend.
+/// Estado 2: el token sirve, falta confirmar el correo.
 class _SinVerificar extends ConsumerWidget {
   const _SinVerificar();
 
@@ -367,37 +415,61 @@ class _SinVerificar extends ConsumerWidget {
     final usuario = ref.watch(usuarioProvider);
 
     return ListView(
-      padding: const EdgeInsets.all(24),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.12),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.10),
         _Mensaje(
           icono: Icons.mark_email_unread_outlined,
           titulo: 'Confirmá tu correo',
           detalle: usuario == null
               ? 'Hasta que confirmes tu correo no podés usar el carrito.'
               : 'Te mandamos un correo a ${usuario.email}. Hasta que lo '
-                  'confirmes podés mirar el catálogo, pero no armar tu '
-                  'pedido.',
+              'confirmes podés mirar el catálogo, pero no armar tu '
+              'pedido.',
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 28),
         Center(
           child: Wrap(
             spacing: 12,
+            runSpacing: 12,
             alignment: WrapAlignment.center,
             children: [
               OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _azul,
+                  side: const BorderSide(color: _azul),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 13,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: () =>
                     ref.read(sesionProvider.notifier).refrescarUsuario(),
                 child: const Text('Ya lo confirmé'),
               ),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _azul,
+                  foregroundColor: _blanco,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 13,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: usuario == null
                     ? null
                     : () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => PantallaInicio(usuario: usuario),
-                          ),
-                        ),
+                  MaterialPageRoute<void>(
+                    builder: (_) => PantallaInicio(usuario: usuario),
+                  ),
+                ),
                 child: const Text('Reenviar correo'),
               ),
             ],
@@ -408,9 +480,12 @@ class _SinVerificar extends ConsumerWidget {
   }
 }
 
-/// Estado 4.
+/// Estado 4: error al cargar el carrito.
 class _Falla extends StatelessWidget {
-  const _Falla({required this.error, required this.onReintentar});
+  const _Falla({
+    required this.error,
+    required this.onReintentar,
+  });
 
   final Object error;
   final VoidCallback onReintentar;
@@ -418,11 +493,15 @@ class _Falla extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(20),
       children: [
         const SizedBox(height: 40),
         if (error is ErrorApi)
-          AvisoError(error: error as ErrorApi, onReintentar: onReintentar)
+          AvisoError(
+            error: error as ErrorApi,
+            onReintentar: onReintentar,
+          )
         else
           AvisoError(
             error: ErrorFormato('$error'),
@@ -432,6 +511,10 @@ class _Falla extends StatelessWidget {
     );
   }
 }
+
+// ====================================================================
+// Mensaje reutilizable
+// ====================================================================
 
 class _Mensaje extends StatelessWidget {
   const _Mensaje({
@@ -446,29 +529,42 @@ class _Mensaje extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colores = Theme.of(context).colorScheme;
-
     return Column(
       children: [
-        Icon(icono, size: 56, color: colores.outline),
-        const SizedBox(height: 16),
+        Container(
+          width: 104,
+          height: 104,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF4FF),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Icon(
+            icono,
+            size: 48,
+            color: _azul,
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(
           titulo,
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: _texto,
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+          ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             detalle,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: colores.outline),
+            style: const TextStyle(
+              color: _secundario,
+              fontSize: 14,
+              height: 1.55,
+            ),
             textAlign: TextAlign.center,
           ),
         ),

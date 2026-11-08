@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,17 +6,8 @@ import '../../core/errores.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/campo_formulario.dart';
-import 'pantalla_diagnostico.dart';
 import 'pantalla_registro.dart';
 
-/// Ingreso con correo y contraseña.
-///
-/// **Los cuatro rechazos del backend llegan igual: 422 sobre `email`.**
-/// Credencial incorrecta, cuenta de baja, cinco intentos fallidos y cuenta de
-/// gestion comparten forma y solo cambian de texto. La pantalla no los
-/// distingue ni lo intenta: muestra el mensaje que escribio Laravel debajo
-/// del campo. Para el caso de la cuenta de gestion ese mensaje ya dice que
-/// hay que ingresar desde el sitio web.
 class PantallaLogin extends ConsumerStatefulWidget {
   const PantallaLogin({super.key});
 
@@ -30,10 +22,10 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
   bool _enviando = false;
 
-  /// Errores por campo que devolvio Laravel en el ultimo intento.
+  // Errores por campo que devolvió Laravel en el último intento.
   Map<String, String> _erroresCampo = {};
 
-  /// Error general (red, 429, 500). Los de validacion no entran aca.
+  // Error general (red, 429, 500).
   ErrorApi? _errorGeneral;
 
   @override
@@ -56,14 +48,11 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
     try {
       await ref.read(sesionProvider.notifier).iniciarSesion(
-            email: _email.text,
-            password: _password.text,
-          );
+        email: _email.text,
+        password: _password.text,
+      );
 
-      // Desde el paso 3 la vitrina es la primera ruta de la pila y el login
-      // se apila encima, asi que hay que sacarlo: antes alcanzaba con que el
-      // widget raiz cambiara de pantalla. `popUntil` y no `pop` porque esto
-      // tambien corre cuando el login quedo debajo del registro.
+      // Vuelve a la primera ruta de la pila después de iniciar sesión.
       if (mounted) {
         Navigator.of(context).popUntil((ruta) => ruta.isFirst);
       }
@@ -81,33 +70,33 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     }
   }
 
-  /// Al corregir un campo se borra su error del servidor: dejarlo pegado
-  /// mientras se escribe la correccion no ayuda a nadie.
+  // Al corregir un campo se borra su error del servidor.
   void _limpiarError(String campo) {
     if (!_erroresCampo.containsKey(campo)) return;
+
     setState(() => _erroresCampo = {..._erroresCampo}..remove(campo));
   }
 
   @override
   Widget build(BuildContext context) {
-    // Aviso de expulsion: "tu sesion vencio", o el motivo del 403.
     final estado = ref.watch(sesionProvider);
     final aviso = estado is SesionInvitado ? estado.aviso : null;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Ingresar'),
-        actions: [
-          IconButton(
-            tooltip: 'Diagnóstico de conexión',
-            icon: const Icon(Icons.wifi_tethering),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const PantallaDiagnostico(),
-              ),
-            ),
+        title: const Text(
+          'Ingresar',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF202B3C),
           ),
-        ],
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF202B3C),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
       ),
       body: SafeArea(
         child: Center(
@@ -115,88 +104,180 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formulario,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'PowerTech',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ingresá para ver precios y comprar.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 24),
-
-                    if (aviso != null)
-                      AvisoInformativo(
-                        titulo: 'Volvé a ingresar',
-                        detalle: aviso,
-                        icono: Icons.lock_clock,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: const Color(0xFFE8EDF3),
+                  ),
+                ),
+                child: Form(
+                  key: _formulario,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Identidad de PowerTech.
+                      Center(
+                        child: Image.asset(
+                          'assets/images/Logo_Primary.png',
+                          width: 68,
+                          height: 68,
+                          fit: BoxFit.contain,
+                        ),
                       ),
 
-                    if (_errorGeneral != null)
-                      AvisoError(
-                        error: _errorGeneral!,
-                        onReintentar: _enviando ? null : _ingresar,
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Bienvenido de nuevo',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                          color: Color(0xFF202B3C),
+                        ),
                       ),
 
-                    CampoFormulario(
-                      controlador: _email,
-                      etiqueta: 'Correo electrónico',
-                      obligatorio: true,
-                      habilitado: !_enviando,
-                      tipoTeclado: TextInputType.emailAddress,
-                      autofill: const [AutofillHints.email],
-                      accionTeclado: TextInputAction.next,
-                      errorServidor: _erroresCampo['email'],
-                      onCambio: (_) => _limpiarError('email'),
-                    ),
+                      const SizedBox(height: 8),
 
-                    CampoFormulario(
-                      controlador: _password,
-                      etiqueta: 'Contraseña',
-                      obligatorio: true,
-                      esPassword: true,
-                      habilitado: !_enviando,
-                      autofill: const [AutofillHints.password],
-                      accionTeclado: TextInputAction.done,
-                      onEnviar: _enviando ? null : _ingresar,
-                      errorServidor: _erroresCampo['password'],
-                      onCambio: (_) => _limpiarError('password'),
-                    ),
+                      const Text(
+                        'Ingresá a tu cuenta para ver precios y realizar tus compras.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
 
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 28),
 
-                    FilledButton(
-                      onPressed: _enviando ? null : _ingresar,
-                      child: _enviando
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Ingresar'),
-                    ),
+                      // Aviso de expulsión o sesión vencida.
+                      if (aviso != null) ...[
+                        AvisoInformativo(
+                          titulo: 'Volvé a ingresar',
+                          detalle: aviso,
+                          icono: Icons.lock_clock,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
-                    const SizedBox(height: 16),
+                      // Error general de la API.
+                      if (_errorGeneral != null) ...[
+                        AvisoError(
+                          error: _errorGeneral!,
+                          onReintentar: _enviando ? null : _ingresar,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
-                    TextButton(
-                      onPressed: _enviando
-                          ? null
-                          : () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const PantallaRegistro(),
-                                ),
+                      CampoFormulario(
+                        controlador: _email,
+                        etiqueta: 'Correo electrónico',
+                        obligatorio: true,
+                        habilitado: !_enviando,
+                        tipoTeclado: TextInputType.emailAddress,
+                        autofill: const [AutofillHints.email],
+                        accionTeclado: TextInputAction.next,
+                        errorServidor: _erroresCampo['email'],
+                        onCambio: (_) => _limpiarError('email'),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      CampoFormulario(
+                        controlador: _password,
+                        etiqueta: 'Contraseña',
+                        obligatorio: true,
+                        esPassword: true,
+                        habilitado: !_enviando,
+                        autofill: const [AutofillHints.password],
+                        accionTeclado: TextInputAction.done,
+                        onEnviar: _enviando ? null : _ingresar,
+                        errorServidor: _erroresCampo['password'],
+                        onCambio: (_) => _limpiarError('password'),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: _enviando ? null : _ingresar,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor:
+                            const Color(0xFF93B4F5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: _enviando
+                              ? const SizedBox(
+                            width: 21,
+                            height: 21,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : const Text('Ingresar'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Row(
+                        children: const [
+                          Expanded(
+                            child: Divider(color: Color(0xFFE8EDF3)),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              '¿Sos nuevo en PowerTech?',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF94A3B8),
                               ),
-                      child: const Text('No tengo cuenta, quiero registrarme'),
-                    ),
-                  ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Divider(color: Color(0xFFE8EDF3)),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      TextButton(
+                        onPressed: _enviando
+                            ? null
+                            : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                            const PantallaRegistro(),
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF2563EB),
+                          textStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: const Text('Crear una cuenta'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

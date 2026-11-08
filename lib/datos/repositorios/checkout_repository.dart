@@ -2,6 +2,7 @@ import '../../core/api_client.dart';
 import '../../core/errores.dart';
 import '../modelos/checkout.dart';
 import '../modelos/conversiones.dart';
+import '../modelos/pago.dart';
 
 /// Centinela para distinguir "no mandar el campo" de "mandarlo en null".
 ///
@@ -20,9 +21,9 @@ const Object _sinCambio = Object();
 /// **No hay recurso que nombrar en la URL.** El checkout es la vista previa
 /// del carrito abierto de quien trae el token.
 ///
-/// **Acá no se paga nada.** La preferencia de Mercado Pago es el paso 10;
-/// este repositorio sólo consulta el resumen y guarda las preferencias de
-/// entrega.
+/// **Las credenciales de Mercado Pago no pasan por acá.** El `access_token`
+/// vive en Laravel; lo único que la app recibe es la URL pública del checkout
+/// y lo único que manda es la confirmación del cliente.
 class CheckoutRepository {
   const CheckoutRepository(this._api);
 
@@ -93,6 +94,92 @@ class CheckoutRepository {
     }
 
     return ResumenCheckout.fromJson(datos);
+  }
+
+  /// POST /checkout/pagar
+  ///
+  /// Pide la orden de cobro. El backend revalida todo —carrito, productos,
+  /// precios, datos fiscales— y calcula el importe desde cero: nada de lo que
+  /// mande la app participa del total.
+  ///
+  /// **No crea el pedido.** Devuelve a dónde mandar al cliente a pagar; la
+  /// venta nace cuando el pago se acredita, por el webhook.
+  ///
+  /// `confirma` es la conformidad explícita del cliente con que el pago es
+  /// previo al pedido. El backend la exige.
+  ///
+  /// Errores propios de esta llamada, los dos como [ErrorServidor] con su
+  /// `codigo`, porque `errores.dart` manda ahí todo lo que no sean los
+  /// códigos que ya tenían clase propia:
+  ///
+  ///   409  el carrito dejó de ser pagable mientras tanto. El cuerpo trae
+  ///        `bloqueos`, pero la pantalla no los lee de acá: vuelve a pedir el
+  ///        checkout y los muestra donde ya los muestra. Una segunda forma de
+  ///        dibujar los mismos bloqueos es una segunda forma de que queden
+  ///        distintos.
+  ///   502  Mercado Pago no respondió. Es reintentable, y por eso el backend
+  ///        lo distingue de un 500.
+  Future<InicioPago> iniciarPago({
+    String? modoEntrega,
+    Object? observaciones = _sinCambio,
+  }) async {
+    final cuerpo = <String, dynamic>{'confirma': true};
+
+    if (modoEntrega != null) {
+      cuerpo['modo_entrega'] = modoEntrega;
+    }
+
+    if (!identical(observaciones, _sinCambio)) {
+      cuerpo['observaciones'] = observaciones;
+    }
+
+    final respuesta = await _api.enviar(
+      (dio) => dio.post('/checkout/pagar', data: cuerpo),
+    );
+
+    final datos = _desenvolver(respuesta.data, 'POST /checkout/pagar', 'url_pago');
+
+    return InicioPago.fromJson(datos);
+  }
+
+  /// GET /checkout/estado
+  ///
+  /// En qué quedó el último intento de pago. Lo decide el backend mirando la
+  /// base y, si hace falta, preguntándole a Mercado Pago por la referencia
+  /// del carrito.
+  ///
+  /// **Es lo que se consulta al volver del navegador.** No se le cree nada a
+  /// la URL de retorno: puede venir editada y puede no llegar nunca.
+  Future<EstadoPago> estadoDelPago() async {
+    final respuesta = await _api.enviar((dio) => dio.get('/checkout/estado'));
+
+    final datos = _desenvolver(respuesta.data, 'GET /checkout/estado', 'estado');
+
+    return EstadoPago.fromJson(datos);
+  }
+
+  /// Saca el objeto de adentro de `data` y comprueba que traiga [claveEsperada].
+  ///
+  /// Mismo criterio que [_leer]: la clave que se exige es una que el contrato
+  /// siempre manda, así una respuesta que no sea la esperada —HTML de una URL
+  /// equivocada, el aviso de ngrok— falla con un mensaje que dice qué llegó
+  /// en lugar de un error de casteo tres capas más arriba.
+  Map<String, dynamic> _desenvolver(
+    dynamic cuerpo,
+    String ruta,
+    String claveEsperada,
+  ) {
+    final raiz = comoMapa(cuerpo);
+    final datos = comoMapa(raiz?['data']) ?? raiz;
+
+    if (datos == null || !datos.containsKey(claveEsperada)) {
+      throw ErrorFormato(
+        'La respuesta de $ruta no tiene la forma esperada. '
+        'Llego: ${_recorte(cuerpo)}',
+      );
+    }
+
+    return datos;
   }
 }
 

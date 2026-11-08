@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,16 +10,6 @@ import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/campo_formulario.dart';
 
-/// Alta de un cliente desde la app.
-///
-/// Los nombres de los campos son los de `RegistroClienteRequest`, que el
-/// backend reutiliza tal cual del registro web: por eso las claves del 422
-/// coinciden una a una con los controladores de abajo.
-///
-/// Las dos listas fiscales se piden a `/datos-fiscales`. **Ningun id esta
-/// escrito en la app**: lo unico que viaja en el codigo son los codigos de
-/// ARCA de [CodigosAfip], y solo para elegir el teclado y adelantar un
-/// aviso. Quien valida es Laravel.
 class PantallaRegistro extends ConsumerStatefulWidget {
   const PantallaRegistro({super.key});
 
@@ -71,22 +62,18 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
 
     try {
       await ref.read(sesionProvider.notifier).registrar(
-            nombres: _nombres.text,
-            apellido: _apellido.text,
-            email: _email.text,
-            password: _password.text,
-            passwordConfirmation: _passwordConfirmacion.text,
-            tipoDocumentoId: _tipoDocumento!.id,
-            nroDoc: _nroDoc.text,
-            condicionIvaId: _condicionIva!.id,
-            razonSocial: _razonSocial.text,
-            telefono: _telefono.text,
-          );
+        nombres: _nombres.text,
+        apellido: _apellido.text,
+        email: _email.text,
+        password: _password.text,
+        passwordConfirmation: _passwordConfirmacion.text,
+        tipoDocumentoId: _tipoDocumento!.id,
+        nroDoc: _nroDoc.text,
+        condicionIvaId: _condicionIva!.id,
+        razonSocial: _razonSocial.text,
+        telefono: _telefono.text,
+      );
 
-      // Esta pantalla esta apilada sobre el login, que a su vez esta apilado
-      // sobre la vitrina. Un `pop` suelto dejaria al cliente recien
-      // registrado mirando el formulario de login: hay que volver hasta la
-      // vitrina, que desde el paso 3 es la primera ruta.
       if (mounted) {
         Navigator.of(context).popUntil((ruta) => ruta.isFirst);
       }
@@ -105,10 +92,9 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
     }
   }
 
-  /// El formulario es largo: si el error cayo arriba y el usuario esta abajo,
-  /// no lo ve. Se sube al principio, donde esta el resumen.
   void _irAlPrimerError() {
     if (!mounted || _erroresCampo.isEmpty) return;
+
     Scrollable.ensureVisible(
       _formulario.currentContext!,
       duration: const Duration(milliseconds: 250),
@@ -118,6 +104,7 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
 
   void _limpiarError(String campo) {
     if (!_erroresCampo.containsKey(campo)) return;
+
     setState(() => _erroresCampo = {..._erroresCampo}..remove(campo));
   }
 
@@ -126,10 +113,25 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
     final fiscales = ref.watch(datosFiscalesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        title: const Text(
+          'Crear cuenta',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF202B3C),
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF202B3C),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
       body: SafeArea(
         child: fiscales.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(
+            child: CircularProgressIndicator(),
+          ),
           error: (e, _) => _FallaDatosFiscales(
             error: e,
             onReintentar: () => ref.invalidate(datosFiscalesProvider),
@@ -149,198 +151,301 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
     );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: Form(
-            key: _formulario,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_errorGeneral != null) AvisoError(error: _errorGeneral!),
-
-                if (_erroresCampo.isNotEmpty)
-                  AvisoInformativo(
-                    titulo: 'Revisá los campos marcados',
-                    detalle: 'El servidor rechazó ${_erroresCampo.length} '
-                        '${_erroresCampo.length == 1 ? "campo" : "campos"}. '
-                        'El detalle está debajo de cada uno.',
-                    icono: Icons.edit_note,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFFE8EDF3),
+              ),
+            ),
+            child: Form(
+              key: _formulario,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Encabezado.
+                  Center(
+                    child: Image.asset(
+                      'assets/images/Logo_Primary.png',
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.contain,
+                    ),
                   ),
 
-                const _Titulo('Tus datos'),
+                  const SizedBox(height: 16),
 
-                CampoFormulario(
-                  controlador: _nombres,
-                  etiqueta: 'Nombres',
-                  obligatorio: true,
-                  habilitado: !_enviando,
-                  autofill: const [AutofillHints.givenName],
-                  accionTeclado: TextInputAction.next,
-                  errorServidor: _erroresCampo['nombres'],
-                  onCambio: (_) => _limpiarError('nombres'),
-                ),
-
-                CampoFormulario(
-                  controlador: _apellido,
-                  etiqueta: 'Apellido',
-                  obligatorio: true,
-                  habilitado: !_enviando,
-                  autofill: const [AutofillHints.familyName],
-                  accionTeclado: TextInputAction.next,
-                  errorServidor: _erroresCampo['apellido'],
-                  onCambio: (_) => _limpiarError('apellido'),
-                ),
-
-                CampoFormulario(
-                  controlador: _email,
-                  etiqueta: 'Correo electrónico',
-                  obligatorio: true,
-                  habilitado: !_enviando,
-                  tipoTeclado: TextInputType.emailAddress,
-                  autofill: const [AutofillHints.email],
-                  accionTeclado: TextInputAction.next,
-                  ayuda: 'Te vamos a mandar un correo para verificarlo.',
-                  errorServidor: _erroresCampo['email'],
-                  onCambio: (_) => _limpiarError('email'),
-                ),
-
-                CampoFormulario(
-                  controlador: _telefono,
-                  etiqueta: 'Teléfono (opcional)',
-                  habilitado: !_enviando,
-                  tipoTeclado: TextInputType.phone,
-                  largoMaximo: 30,
-                  accionTeclado: TextInputAction.next,
-                  errorServidor: _erroresCampo['telefono'],
-                  onCambio: (_) => _limpiarError('telefono'),
-                ),
-
-                const SizedBox(height: 8),
-                const _Titulo('Contraseña'),
-
-                CampoFormulario(
-                  controlador: _password,
-                  etiqueta: 'Contraseña',
-                  obligatorio: true,
-                  esPassword: true,
-                  habilitado: !_enviando,
-                  autofill: const [AutofillHints.newPassword],
-                  accionTeclado: TextInputAction.next,
-                  // El largo minimo y las reglas las pone Password::defaults()
-                  // en Laravel. No se replican aca para no quedar
-                  // desincronizadas si alla cambian.
-                  errorServidor: _erroresCampo['password'],
-                  onCambio: (_) => _limpiarError('password'),
-                ),
-
-                CampoFormulario(
-                  controlador: _passwordConfirmacion,
-                  etiqueta: 'Repetir contraseña',
-                  obligatorio: true,
-                  esPassword: true,
-                  habilitado: !_enviando,
-                  accionTeclado: TextInputAction.next,
-                  // La regla 'confirmed' cuelga el error de 'password', no de
-                  // 'password_confirmation'. Se muestra en los dos para que
-                  // se vea al lado del campo que hay que corregir.
-                  errorServidor: _erroresCampo['password_confirmation'],
-                  onCambio: (_) => _limpiarError('password_confirmation'),
-                ),
-
-                const SizedBox(height: 8),
-                const _Titulo('Datos para facturarte'),
-
-                CampoDesplegable<OpcionFiscal>(
-                  valor: _condicionIva,
-                  opciones: fiscales.condicionesIva,
-                  etiqueta: 'Condición frente al IVA',
-                  textoDe: (o) => o.nombre,
-                  habilitado: !_enviando,
-                  errorServidor: _erroresCampo['condicion_iva_id'],
-                  onCambio: (valor) {
-                    setState(() => _condicionIva = valor);
-                    _limpiarError('condicion_iva_id');
-                  },
-                ),
-
-                CampoDesplegable<OpcionFiscal>(
-                  valor: _tipoDocumento,
-                  opciones: fiscales.tiposDocumento,
-                  etiqueta: 'Tipo de documento',
-                  textoDe: (o) => o.nombre,
-                  habilitado: !_enviando,
-                  errorServidor: _erroresCampo['tipo_documento_id'],
-                  onCambio: (valor) {
-                    setState(() {
-                      _tipoDocumento = valor;
-                      // Cambiar de DNI a CUIT cambia el largo esperado: lo
-                      // que estaba escrito ya no sirve.
-                      _nroDoc.clear();
-                    });
-                    _limpiarError('tipo_documento_id');
-                    _limpiarError('nro_doc');
-                  },
-                ),
-
-                if (avisoFiscal != null)
-                  AvisoInformativo(
-                    titulo: 'Revisá el tipo de documento',
-                    detalle: avisoFiscal,
-                    icono: Icons.receipt_long,
+                  const Text(
+                    'Creá tu cuenta',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                      color: Color(0xFF202B3C),
+                    ),
                   ),
 
-                CampoFormulario(
-                  controlador: _nroDoc,
-                  etiqueta: 'Número de documento',
-                  obligatorio: true,
-                  habilitado: !_enviando && _tipoDocumento != null,
-                  soloDigitos: true,
-                  tipoTeclado: TextInputType.number,
-                  largoMaximo: CodigosAfip.largoMaximo(codigoDoc),
-                  ayuda: _tipoDocumento == null
-                      ? 'Elegí primero el tipo de documento.'
-                      : CodigosAfip.ayudaDocumento(codigoDoc),
-                  accionTeclado: TextInputAction.next,
-                  errorServidor: _erroresCampo['nro_doc'],
-                  onCambio: (_) => _limpiarError('nro_doc'),
-                ),
+                  const SizedBox(height: 8),
 
-                CampoFormulario(
-                  controlador: _razonSocial,
-                  etiqueta: 'Razón social (opcional)',
-                  habilitado: !_enviando,
-                  largoMaximo: 150,
-                  ayuda: 'Si la dejás vacía usamos tu apellido y nombres.',
-                  accionTeclado: TextInputAction.done,
-                  onEnviar: _enviando ? null : _registrar,
-                  errorServidor: _erroresCampo['razon_social'],
-                  onCambio: (_) => _limpiarError('razon_social'),
-                ),
+                  const Text(
+                    'Completá tus datos para empezar a disfrutar de PowerTech.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 28),
 
-                FilledButton(
-                  onPressed: _enviando ? null : _registrar,
-                  child: _enviando
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Crear cuenta'),
-                ),
+                  // Errores generales.
+                  if (_errorGeneral != null) ...[
+                    AvisoError(error: _errorGeneral!),
+                    const SizedBox(height: 16),
+                  ],
 
-                const SizedBox(height: 12),
+                  if (_erroresCampo.isNotEmpty) ...[
+                    AvisoInformativo(
+                      titulo: 'Revisá los campos marcados',
+                      detalle: 'El servidor rechazó ${_erroresCampo.length} '
+                          '${_erroresCampo.length == 1 ? "campo" : "campos"}. '
+                          'El detalle está debajo de cada uno.',
+                      icono: Icons.edit_note,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
-                Text(
-                  'Vas a poder navegar el catálogo enseguida. Para comprar, '
-                  'primero tenés que verificar tu correo.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+                  // Datos personales.
+                  const _TituloSeccion(
+                    titulo: 'Datos personales',
+                    subtitulo: 'Contanos un poco sobre vos.',
+                    icono: Icons.person_outline_rounded,
+                  ),
+
+                  CampoFormulario(
+                    controlador: _nombres,
+                    etiqueta: 'Nombres',
+                    obligatorio: true,
+                    habilitado: !_enviando,
+                    autofill: const [AutofillHints.givenName],
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['nombres'],
+                    onCambio: (_) => _limpiarError('nombres'),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _apellido,
+                    etiqueta: 'Apellido',
+                    obligatorio: true,
+                    habilitado: !_enviando,
+                    autofill: const [AutofillHints.familyName],
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['apellido'],
+                    onCambio: (_) => _limpiarError('apellido'),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _email,
+                    etiqueta: 'Correo electrónico',
+                    obligatorio: true,
+                    habilitado: !_enviando,
+                    tipoTeclado: TextInputType.emailAddress,
+                    autofill: const [AutofillHints.email],
+                    accionTeclado: TextInputAction.next,
+                    ayuda: 'Te vamos a mandar un correo para verificarlo.',
+                    errorServidor: _erroresCampo['email'],
+                    onCambio: (_) => _limpiarError('email'),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _telefono,
+                    etiqueta: 'Teléfono (opcional)',
+                    habilitado: !_enviando,
+                    tipoTeclado: TextInputType.phone,
+                    largoMaximo: 30,
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['telefono'],
+                    onCambio: (_) => _limpiarError('telefono'),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Contraseña.
+                  const _TituloSeccion(
+                    titulo: 'Seguridad',
+                    subtitulo: 'Elegí una contraseña para proteger tu cuenta.',
+                    icono: Icons.lock_outline_rounded,
+                  ),
+
+                  CampoFormulario(
+                    controlador: _password,
+                    etiqueta: 'Contraseña',
+                    obligatorio: true,
+                    esPassword: true,
+                    habilitado: !_enviando,
+                    autofill: const [AutofillHints.newPassword],
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['password'],
+                    onCambio: (_) => _limpiarError('password'),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _passwordConfirmacion,
+                    etiqueta: 'Repetir contraseña',
+                    obligatorio: true,
+                    esPassword: true,
+                    habilitado: !_enviando,
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['password_confirmation'],
+                    onCambio: (_) =>
+                        _limpiarError('password_confirmation'),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Datos fiscales.
+                  const _TituloSeccion(
+                    titulo: 'Datos de facturación',
+                    subtitulo: 'Necesitamos estos datos para tus comprobantes.',
+                    icono: Icons.receipt_long_outlined,
+                  ),
+
+                  CampoDesplegable<OpcionFiscal>(
+                    valor: _condicionIva,
+                    opciones: fiscales.condicionesIva,
+                    etiqueta: 'Condición frente al IVA',
+                    textoDe: (o) => o.nombre,
+                    habilitado: !_enviando,
+                    errorServidor: _erroresCampo['condicion_iva_id'],
+                    onCambio: (valor) {
+                      setState(() => _condicionIva = valor);
+                      _limpiarError('condicion_iva_id');
+                    },
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoDesplegable<OpcionFiscal>(
+                    valor: _tipoDocumento,
+                    opciones: fiscales.tiposDocumento,
+                    etiqueta: 'Tipo de documento',
+                    textoDe: (o) => o.nombre,
+                    habilitado: !_enviando,
+                    errorServidor: _erroresCampo['tipo_documento_id'],
+                    onCambio: (valor) {
+                      setState(() {
+                        _tipoDocumento = valor;
+                        _nroDoc.clear();
+                      });
+                      _limpiarError('tipo_documento_id');
+                      _limpiarError('nro_doc');
+                    },
+                  ),
+
+                  if (avisoFiscal != null) ...[
+                    const SizedBox(height: 12),
+                    AvisoInformativo(
+                      titulo: 'Revisá el tipo de documento',
+                      detalle: avisoFiscal,
+                      icono: Icons.info_outline_rounded,
+                    ),
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _nroDoc,
+                    etiqueta: 'Número de documento',
+                    obligatorio: true,
+                    habilitado: !_enviando && _tipoDocumento != null,
+                    soloDigitos: true,
+                    tipoTeclado: TextInputType.number,
+                    largoMaximo: CodigosAfip.largoMaximo(codigoDoc),
+                    ayuda: _tipoDocumento == null
+                        ? 'Elegí primero el tipo de documento.'
+                        : CodigosAfip.ayudaDocumento(codigoDoc),
+                    accionTeclado: TextInputAction.next,
+                    errorServidor: _erroresCampo['nro_doc'],
+                    onCambio: (_) => _limpiarError('nro_doc'),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  CampoFormulario(
+                    controlador: _razonSocial,
+                    etiqueta: 'Razón social (opcional)',
+                    habilitado: !_enviando,
+                    largoMaximo: 150,
+                    ayuda: 'Si la dejás vacía usamos tu apellido y nombres.',
+                    accionTeclado: TextInputAction.done,
+                    onEnviar: _enviando ? null : _registrar,
+                    errorServidor: _erroresCampo['razon_social'],
+                    onCambio: (_) => _limpiarError('razon_social'),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Acción principal.
+                  SizedBox(
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: _enviando ? null : _registrar,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                        const Color(0xFF93B4F5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: _enviando
+                          ? const SizedBox(
+                        width: 21,
+                        height: 21,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: Colors.white,
+                        ),
+                      )
+                          : const Text('Crear cuenta'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Vas a poder navegar el catálogo enseguida. '
+                        'Para comprar, primero tenés que verificar tu correo.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -349,48 +454,154 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
   }
 }
 
-class _Titulo extends StatelessWidget {
-  const _Titulo(this.texto);
+class _TituloSeccion extends StatelessWidget {
+  const _TituloSeccion({
+    required this.titulo,
+    required this.subtitulo,
+    required this.icono,
+  });
 
-  final String texto;
+  final String titulo;
+  final String subtitulo;
+  final IconData icono;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(texto, style: Theme.of(context).textTheme.titleMedium),
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icono,
+              color: const Color(0xFF2563EB),
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF202B3C),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitulo,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.4,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Sin las listas fiscales el formulario no se puede armar: los dos
-/// desplegables quedarian vacios y el registro fallaria con un 422 que el
-/// usuario no puede corregir. Por eso se corta aca en lugar de mostrar el
-/// formulario a medias.
+/// Si no se cargan las listas fiscales, el registro no puede completarse.
 class _FallaDatosFiscales extends StatelessWidget {
-  const _FallaDatosFiscales({required this.error, required this.onReintentar});
+  const _FallaDatosFiscales({
+    required this.error,
+    required this.onReintentar,
+  });
 
   final Object error;
   final VoidCallback onReintentar;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (error is ErrorApi)
-            AvisoError(error: error as ErrorApi, onReintentar: onReintentar)
-          else
-            Text('$error'),
-          const SizedBox(height: 8),
-          const Text(
-            'No pudimos cargar los tipos de documento y las condiciones de '
-            'IVA, así que no se puede completar el registro. Probá de nuevo '
-            'en un momento.',
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFE8EDF3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  size: 42,
+                  color: Color(0xFF64748B),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No pudimos preparar el registro',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF202B3C),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (error is ErrorApi)
+                  AvisoError(
+                    error: error as ErrorApi,
+                    onReintentar: onReintentar,
+                  )
+                else
+                  Text(
+                    '$error',
+                    textAlign: TextAlign.center,
+                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'No pudimos cargar los tipos de documento y las '
+                      'condiciones de IVA, así que no se puede completar '
+                      'el registro. Probá de nuevo en un momento.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: onReintentar,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Reintentar'),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

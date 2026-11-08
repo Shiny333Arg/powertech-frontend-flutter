@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,19 +7,7 @@ import '../../datos/modelos/usuario.dart';
 import '../../estado/proveedores_core.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
-import 'pantalla_diagnostico.dart';
 
-/// Pantalla provisoria de sesión iniciada.
-///
-/// En el paso 3 la reemplaza la vitrina. Lo que hay acá es lo mínimo para
-/// poder verificar el paso 2: quién inició sesión, en qué estado está su
-/// correo, y el botón de cerrar sesión.
-///
-/// El aviso de correo sin verificar **no es decorativo**: es el segundo de
-/// los tres estados del contrato. El cliente tiene token y puede mirar, pero
-/// el middleware `verified` le va a rechazar carrito y checkout. Mostrarlo
-/// acá es lo que evita que se entere recién con un 403 a mitad de una
-/// compra.
 class PantallaInicio extends ConsumerStatefulWidget {
   const PantallaInicio({super.key, required this.usuario});
 
@@ -39,7 +28,6 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
 
     try {
       mensaje = await ref.read(authRepositoryProvider).reenviarVerificacion();
-      // Puede haber verificado desde el navegador mientras tanto.
       await ref.read(sesionProvider.notifier).refrescarUsuario();
     } on ErrorDemasiadosIntentos catch (e) {
       mensaje = e.mensaje;
@@ -52,7 +40,9 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
     if (!mounted) return;
 
     setState(() => _reenviando = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mensaje)),
+    );
   }
 
   Future<void> _cerrarSesion() async {
@@ -60,11 +50,6 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
 
     await ref.read(sesionProvider.notifier).cerrarSesion();
 
-    // Desde el paso 3 esta pantalla está apilada sobre la vitrina en lugar de
-    // ser la raíz del cliente, así que hay que volver: si no, el usuario se
-    // queda mirando sus propios datos después de cerrar sesión. La vitrina ya
-    // se recargó sola —`cerrarSesion()` invalida el catálogo— y aparece sin
-    // precios.
     if (mounted) {
       Navigator.of(context).popUntil((ruta) => ruta.isFirst);
     }
@@ -72,54 +57,51 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
 
   @override
   Widget build(BuildContext context) {
-    // Se mira el provider y no solo `widget.usuario`. En el paso 2 esta
-    // pantalla era la raíz del cliente y el widget raíz la reconstruía con el
-    // usuario nuevo; ahora está apilada sobre la vitrina, así que si leyera
-    // únicamente el parámetro del constructor, `refrescarUsuario()` no se
-    // vería: el cliente que verifica su correo en el navegador y vuelve
-    // seguiría mirando el cartel de "verificá tu correo".
-    //
-    // El fallback cubre el instante entre cerrar sesión y el pop, cuando el
-    // provider ya devuelve null pero esta pantalla todavía está en pantalla.
     final usuario = ref.watch(usuarioProvider) ?? widget.usuario;
     final cliente = usuario.cliente;
+    final colores = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Mi cuenta'),
-        actions: [
-          IconButton(
-            tooltip: 'Diagnóstico de conexión',
-            icon: const Icon(Icons.wifi_tethering),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const PantallaDiagnostico(),
-              ),
-            ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 20,
+        title: const Text(
+          'Mi cuenta',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            letterSpacing: -0.4,
+            color: Color(0xFF202B3C),
           ),
-        ],
+        ),
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
           children: [
-            Text(
-              'Hola, ${usuario.nombres}',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
+            // Encabezado del perfil.
+            _TarjetaPerfil(usuario: usuario),
 
-            if (!usuario.emailVerificado)
+            const SizedBox(height: 20),
+
+            // Avisos de cuenta.
+            if (!usuario.emailVerificado) ...[
               AvisoInformativo(
                 titulo: 'Verificá tu correo',
-                detalle: 'Te mandamos un correo a ${usuario.email}. Hasta que '
-                    'lo verifiques vas a poder mirar el catálogo, pero no '
-                    'agregar al carrito ni comprar.',
+                detalle: 'Te mandamos un correo a ${usuario.email}. '
+                    'Hasta que lo verifiques vas a poder mirar el catálogo, '
+                    'pero no agregar al carrito ni comprar.',
                 icono: Icons.mark_email_unread_outlined,
                 accion: _reenviando ? null : _reenviarVerificacion,
                 textoAccion: 'Reenviar correo',
                 ocupado: _reenviando,
               ),
+              const SizedBox(height: 12),
+            ],
 
             if (cliente == null)
               const AvisoInformativo(
@@ -135,45 +117,114 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
                 detalle: 'Te falta cargar el tipo de documento o la condición '
                     'frente al IVA. Sin eso no vamos a poder facturarte la '
                     'compra.',
-                icono: Icons.receipt_long,
+                icono: Icons.receipt_long_rounded,
               ),
 
-            const Divider(height: 32),
+            const SizedBox(height: 24),
 
-            _Dato('Nombre', usuario.nombreCompleto),
-            _Dato('Correo', usuario.email),
-            _Dato(
-              'Correo verificado',
-              usuario.emailVerificado ? 'Sí' : 'Todavía no',
+            const _TituloSeccion('Información personal'),
+            const SizedBox(height: 12),
+
+            _TarjetaDatos(
+              children: [
+                _Dato(
+                  etiqueta: 'Nombre completo',
+                  valor: usuario.nombreCompleto,
+                  icono: Icons.person_outline_rounded,
+                ),
+                _Dato(
+                  etiqueta: 'Correo electrónico',
+                  valor: usuario.email,
+                  icono: Icons.email_outlined,
+                ),
+                _Dato(
+                  etiqueta: 'Estado del correo',
+                  valor: usuario.emailVerificado ? 'Verificado' : 'Pendiente',
+                  icono: Icons.verified_user_outlined,
+                  estado: usuario.emailVerificado,
+                ),
+              ],
             ),
 
             if (cliente != null) ...[
-              const Divider(height: 32),
-              _Dato('Razón social', cliente.razonSocial ?? '—'),
-              _Dato('Teléfono', cliente.telefono ?? '—'),
-              _Dato(
-                'Documento',
-                cliente.tipoDocumento == null
-                    ? cliente.nroDoc
-                    : '${cliente.tipoDocumento!.nombre} ${cliente.nroDoc}',
+              const SizedBox(height: 24),
+              const _TituloSeccion('Datos de facturación'),
+              const SizedBox(height: 12),
+              _TarjetaDatos(
+                children: [
+                  _Dato(
+                    etiqueta: 'Razón social',
+                    valor: cliente.razonSocial ?? '—',
+                    icono: Icons.business_outlined,
+                  ),
+                  _Dato(
+                    etiqueta: 'Teléfono',
+                    valor: cliente.telefono ?? '—',
+                    icono: Icons.phone_outlined,
+                  ),
+                  _Dato(
+                    etiqueta: 'Documento',
+                    valor: cliente.tipoDocumento == null
+                        ? cliente.nroDoc
+                        : '${cliente.tipoDocumento!.nombre} ${cliente.nroDoc}',
+                    icono: Icons.badge_outlined,
+                  ),
+                  _Dato(
+                    etiqueta: 'Condición frente al IVA',
+                    valor: cliente.condicionIva?.nombre ?? '—',
+                    icono: Icons.receipt_long_outlined,
+                  ),
+                ],
               ),
-              _Dato('Condición IVA', cliente.condicionIva?.nombre ?? '—'),
             ],
 
             const SizedBox(height: 32),
 
-            OutlinedButton.icon(
-              onPressed: _cerrando ? null : _cerrarSesion,
-              icon: const Icon(Icons.logout),
-              label: Text(_cerrando ? 'Cerrando...' : 'Cerrar sesión'),
+            // Cierre de sesión.
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _cerrando ? null : _cerrarSesion,
+                icon: _cerrando
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.logout_rounded, size: 19),
+                label: Text(
+                  _cerrando ? 'Cerrando sesión...' : 'Cerrar sesión',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC4545),
+                  side: BorderSide(
+                    color: const Color(0xFFDC4545).withValues(alpha: 0.4),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
 
-            Text(
-              'Cerrar sesión revoca el token de este dispositivo solamente. '
-              'Si iniciaste sesión en otro, ese sigue abierto.',
-              style: Theme.of(context).textTheme.bodySmall,
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Cerrar sesión revoca el token de este dispositivo solamente. '
+                    'Si iniciaste sesión en otro, ese sigue abierto.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
             ),
           ],
         ),
@@ -182,27 +233,219 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
   }
 }
 
-class _Dato extends StatelessWidget {
-  const _Dato(this.etiqueta, this.valor);
 
-  final String etiqueta;
-  final String valor;
+class _TarjetaPerfil extends StatelessWidget {
+  const _TarjetaPerfil({required this.usuario});
+
+  final Usuario usuario;
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8EDF3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'MI CUENTA',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Hola, ${usuario.nombres}',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.7,
+              color: Color(0xFF202B3C),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Administrá tu información personal y de facturación.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _EstadoCorreo extends StatelessWidget {
+  const _EstadoCorreo({required this.verificado});
+
+  final bool verificado;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = verificado
+        ? const Color(0xFF16845B)
+        : const Color(0xFFB7791F);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            verificado
+                ? Icons.check_circle_rounded
+                : Icons.schedule_rounded,
+            size: 13,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            verificado ? 'Correo verificado' : 'Correo pendiente',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TituloSeccion extends StatelessWidget {
+  const _TituloSeccion(this.texto);
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 22,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          texto,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: Color(0xFF202B3C),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TarjetaDatos extends StatelessWidget {
+  const _TarjetaDatos({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8EDF3)),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _Dato extends StatelessWidget {
+  const _Dato({
+    required this.etiqueta,
+    required this.valor,
+    required this.icono,
+    this.estado,
+  });
+
+  final String etiqueta;
+  final String valor;
+  final IconData icono;
+  final bool? estado;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorEstado = estado == true
+        ? const Color(0xFF16845B)
+        : const Color(0xFFB7791F);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 13),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              etiqueta,
-              style: Theme.of(context).textTheme.labelLarge,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              icono,
+              size: 19,
+              color: const Color(0xFF64748B),
             ),
           ),
-          Expanded(child: SelectableText(valor)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  etiqueta,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  valor,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                    color: estado == null
+                        ? const Color(0xFF202B3C)
+                        : colorEstado,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

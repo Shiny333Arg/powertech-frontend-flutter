@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errores.dart';
 import '../../core/formato.dart';
+import '../../core/navegador.dart';
 import '../../datos/modelos/bloqueo_checkout.dart';
 import '../../datos/modelos/checkout.dart';
 import '../../datos/modelos/linea_carrito.dart';
 import '../../datos/modelos/usuario.dart';
 import '../../estado/checkout_providers.dart';
+import '../../estado/proveedores_core.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/imagen_remota.dart';
@@ -15,6 +17,7 @@ import '../widgets/lista_bloqueos.dart';
 import '../widgets/resumen_carrito.dart';
 import '../widgets/selector_entrega.dart';
 import '../widgets/tarjeta_facturacion.dart';
+import 'pantalla_esperando_pago.dart';
 import 'pantalla_inicio.dart';
 
 /// Revisión previa al pago: `GET /api/v1/checkout` y `PATCH` de preferencias.
@@ -52,6 +55,11 @@ class _PantallaCheckoutState extends ConsumerState<PantallaCheckout> {
   /// resumen entero recalculado, así que dos en paralelo pueden llegar
   /// desordenados y dejar en pantalla el resultado del primero.
   bool _ocupado = false;
+
+  /// Hay una orden de cobro en curso. Separado de [_ocupado] porque bloquea
+  /// cosas distintas: aquel apaga los controles de entrega, éste el botón de
+  /// pagar, y el pago tarda más.
+  bool _pagando = false;
 
   Future<void> _guardar(Future<void> Function() accion) async {
     if (_ocupado) return;
@@ -164,7 +172,7 @@ class _PantallaCheckoutState extends ConsumerState<PantallaCheckout> {
           ? const _SinAcceso()
           : _Resumen(
               resumen: resumen,
-              ocupado: _ocupado,
+              ocupado: _ocupado || _pagando,
               onRecargar: () => ref.read(checkoutProvider.notifier).recargar(),
               onResolver: _resolver,
               onVerPerfil: _verPerfil,
@@ -176,18 +184,73 @@ class _PantallaCheckoutState extends ConsumerState<PantallaCheckout> {
                     .read(checkoutProvider.notifier)
                     .guardarObservaciones(texto),
               ),
-              onPagar: _avisarPagoPendiente,
+              onPagar: _pagar,
             ),
     );
   }
 
-  /// El pago es el paso 10.
+  /// Arranca el pago: pide la orden de cobro y abre Mercado Pago.
   ///
-  /// El botón existe y se habilita con `puede_pagar` de verdad, para poder
-  /// verificar que la bandera funciona de punta a punta. Lo que no hace es
-  /// aparentar una compra: avisa que falta la pasarela y no toca nada.
-  void _avisarPagoPendiente() {
-    _avisar('El pago con Mercado Pago llega en la próxima etapa.');
+  /// **El backend revalida todo en este momento**, no en el resumen: entre
+  /// que el cliente miró la pantalla y tocó el botón pudo despublicarse un
+  /// producto. Por eso un 409 acá no es un error raro, es el caso previsto, y
+  /// se resuelve refrescando el resumen para que los bloqueos aparezcan
+  /// donde ya se muestran.
+  ///
+  /// **No se crea ningún pedido de este lado.** Lo que vuelve es una URL.
+  Future<void> _pagar() async {
+    // Dos toques seguidos crearían dos órdenes de cobro en Mercado Pago.
+    if (_pagando) return;
+
+    setState(() => _pagando = true);
+
+    try {
+      final inicio = await ref.read(checkoutRepositoryProvider).iniciarPago();
+
+      final abierto = await abrirEnNavegador(inicio.urlPago);
+
+      if (!mounted) return;
+
+      if (!abierto) {
+        _avisar(
+          'No pudimos abrir Mercado Pago. Revisá que tengas un navegador '
+          'disponible y probá de nuevo.',
+        );
+        return;
+      }
+
+      // Se apila la pantalla de espera ANTES de que el cliente vuelva: es la
+      // que escucha el regreso al frente y le pregunta al backend qué pasó.
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PantallaEsperandoPago(urlPago: inicio.urlPago),
+        ),
+      );
+
+      // Al volver de ahí el carrito pudo convertirse en pedido.
+      if (mounted) ref.invalidate(checkoutProvider);
+    } on ErrorValidacion catch (e) {
+      if (mounted) _avisar(e.mensaje);
+    } on ErrorServidor catch (e) {
+      if (!mounted) return;
+
+      if (e.codigo == 409) {
+        // El carrito dejó de ser pagable. Se vuelve a pedir el resumen: los
+        // bloqueos nuevos se dibujan en el mismo lugar de siempre.
+        _avisar(e.mensaje);
+        await ref.read(checkoutProvider.notifier).recargar();
+      } else {
+        // 502 incluido: Mercado Pago no respondió y se puede reintentar.
+        _avisar(e.mensaje);
+      }
+    } on ErrorEmailNoVerificado {
+      if (mounted) _avisar('Necesitás confirmar tu correo para comprar.');
+      await ref.read(sesionProvider.notifier).refrescarUsuario();
+    } on ErrorApi catch (e) {
+      if (mounted) _avisar(e is ErrorRed ? _sinConexion : e.mensaje);
+    } finally {
+      if (mounted) setState(() => _pagando = false);
+    }
   }
 }
 

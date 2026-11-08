@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,15 +16,12 @@ import 'pantalla_producto.dart';
 /// Catálogo paginado: `GET /api/v1/productos`.
 ///
 /// Se abre de tres maneras y las tres pasan por [filtrosIniciales]:
+/// - Desde la vitrina, sin filtros.
+/// - Desde un banner de promoción, con `promocionId`.
+/// - Desde la búsqueda, con `q`.
 ///
-///  - desde la vitrina, sin filtros;
-///  - desde un banner de promoción, con `promocionId`;
-///  - desde la búsqueda, con `q`.
-///
-/// **Los controles se dibujan desde `filtrosAplicados`**, o sea desde lo que
-/// el backend dijo que aplicó, no desde lo que el usuario pidió. Para el
-/// invitado que pidió un rango de precio, esos chips no aparecen: el servidor
-/// lo descartó y la pantalla no sostiene filtros fantasma.
+/// Los controles se dibujan desde `filtrosAplicados`, es decir, desde lo que
+/// el backend confirmó que aplicó.
 class PantallaCatalogo extends ConsumerStatefulWidget {
   const PantallaCatalogo({super.key, this.filtrosIniciales});
 
@@ -44,8 +42,6 @@ class _PantallaCatalogoState extends ConsumerState<PantallaCatalogo> {
 
     _busqueda.text = iniciales.q ?? '';
 
-    // El provider todavía no existe durante initState: se difiere a la
-    // microtarea siguiente, igual que la restauración de sesión del paso 2.
     Future.microtask(() {
       if (mounted) {
         ref.read(catalogoProvider.notifier).iniciar(iniciales);
@@ -66,11 +62,11 @@ class _PantallaCatalogoState extends ConsumerState<PantallaCatalogo> {
     final texto = _busqueda.text.trim();
 
     ref.read(catalogoProvider.notifier).buscar(
-          estado.filtrosAplicados.copiarCon(
-            q: texto.isEmpty ? null : texto,
-            limpiarQ: texto.isEmpty,
-          ),
-        );
+      estado.filtrosAplicados.copiarCon(
+        q: texto.isEmpty ? null : texto,
+        limpiarQ: texto.isEmpty,
+      ),
+    );
   }
 
   Future<void> _abrirFiltros() async {
@@ -85,7 +81,6 @@ class _PantallaCatalogoState extends ConsumerState<PantallaCatalogo> {
       ),
     );
 
-    // null = salió sin aplicar.
     if (nuevos != null && mounted) {
       ref.read(catalogoProvider.notifier).buscar(nuevos);
     }
@@ -105,21 +100,45 @@ class _PantallaCatalogoState extends ConsumerState<PantallaCatalogo> {
     final titulo = estado.promocion?.nombre ?? 'Catálogo';
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text(titulo, overflow: TextOverflow.ellipsis),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        title: Text(
+          titulo,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF202B3C),
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+        ),
         actions: [
-          IconButton(
-            tooltip: 'Filtros',
-            onPressed: _abrirFiltros,
-            icon: Badge(
-              isLabelVisible:
-                  estado.filtrosAplicados.hayFiltrosDeRefinamiento,
-              child: const Icon(Icons.tune),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: IconButton(
+              tooltip: 'Filtros',
+              onPressed: _abrirFiltros,
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFFF1F5F9),
+                foregroundColor: const Color(0xFF334155),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: Badge(
+                isLabelVisible:
+                estado.filtrosAplicados.hayFiltrosDeRefinamiento,
+                backgroundColor: const Color(0xFF2563EB),
+                child: const Icon(Icons.tune_rounded, size: 21),
+              ),
             ),
           ),
         ],
       ),
-
       body: SafeArea(
         child: Column(
           children: [
@@ -134,6 +153,7 @@ class _PantallaCatalogoState extends ConsumerState<PantallaCatalogo> {
 
             Expanded(
               child: RefreshIndicator(
+                color: const Color(0xFF2563EB),
                 onRefresh: () =>
                     ref.read(catalogoProvider.notifier).recargar(),
                 child: _Cuerpo(
@@ -163,22 +183,62 @@ class _BarraBusqueda extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: TextField(
         controller: controlador,
         enabled: habilitado,
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => onBuscar(),
+        style: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF202B3C),
+        ),
         decoration: InputDecoration(
           hintText: 'Buscar productos, marcas o códigos',
-          prefixIcon: const Icon(Icons.search),
-          border: const OutlineInputBorder(),
-          isDense: true,
+          hintStyle: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF64748B),
+            size: 21,
+          ),
           suffixIcon: IconButton(
             tooltip: 'Buscar',
-            icon: const Icon(Icons.arrow_forward),
             onPressed: habilitado ? onBuscar : null,
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              color: Color(0xFF2563EB),
+            ),
+          ),
+          filled: true,
+          fillColor: const Color(0xFFF5F7FA),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE8EDF3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE8EDF3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(
+              color: Color(0xFF2563EB),
+              width: 1.5,
+            ),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE8EDF3)),
           ),
         ),
       ),
@@ -186,11 +246,7 @@ class _BarraBusqueda extends StatelessWidget {
   }
 }
 
-/// Los filtros activos, cada uno con su "quitar".
-///
-/// Se arman desde `filtrosAplicados`: si el backend descartó un filtro, su
-/// chip no aparece, y eso le dice al usuario qué está pasando sin ningún
-/// cartel extra.
+/// Los filtros activos se construyen desde `filtrosAplicados`.
 class _ChipsDeFiltros extends ConsumerWidget {
   const _ChipsDeFiltros({required this.estado});
 
@@ -242,14 +298,18 @@ class _ChipsDeFiltros extends ConsumerWidget {
         ),
     ];
 
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        itemCount: chips.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) => chips[i],
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SizedBox(
+        height: 38,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: chips.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) => chips[i],
+        ),
       ),
     );
   }
@@ -269,7 +329,11 @@ class _ChipsDeFiltros extends ConsumerWidget {
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.texto, required this.onQuitar, this.icono});
+  const _Chip({
+    required this.texto,
+    required this.onQuitar,
+    this.icono,
+  });
 
   final String texto;
   final VoidCallback onQuitar;
@@ -278,10 +342,32 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InputChip(
-      avatar: icono == null ? null : Icon(icono, size: 16),
-      label: Text(texto, overflow: TextOverflow.ellipsis),
+      avatar: icono == null
+          ? null
+          : Icon(
+        icono,
+        size: 15,
+        color: const Color(0xFF2563EB),
+      ),
+      label: Text(
+        texto,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF334155),
+        ),
+      ),
       onDeleted: onQuitar,
-      deleteIcon: const Icon(Icons.close, size: 16),
+      deleteIcon: const Icon(Icons.close_rounded, size: 15),
+      deleteIconColor: const Color(0xFF64748B),
+      backgroundColor: const Color(0xFFEFF6FF),
+      side: const BorderSide(color: Color(0xFFDBEAFE)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
@@ -300,12 +386,17 @@ class _Cuerpo extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (estado.cargandoPrimera) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF2563EB),
+        ),
+      );
     }
 
     // Falló la primera página: no hay nada que mostrar.
     if (estado.errorInicial != null) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 40),
@@ -321,6 +412,7 @@ class _Cuerpo extends ConsumerWidget {
     if (estado.sinResultados) return const _SinResultados();
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 28),
       children: [
         _Contador(estado: estado),
@@ -331,10 +423,10 @@ class _Cuerpo extends ConsumerWidget {
           onTocarProducto: (producto) => abrirFicha(context, producto),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // El error de una página adicional va al pie, debajo de los productos
-        // que ya se cargaron. Esos no se tocan.
+        // El error de una página adicional se muestra debajo de los
+        // productos ya cargados, sin afectar su contenido.
         if (estado.errorAlCargarMas != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -351,13 +443,36 @@ class _Cuerpo extends ConsumerWidget {
               onPressed: estado.cargandoMas
                   ? null
                   : () => ref.read(catalogoProvider.notifier).cargarMas(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF2563EB),
+                side: const BorderSide(color: Color(0xFFBFDBFE)),
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               child: estado.cargandoMas
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Cargar más'),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF2563EB),
+                ),
+              )
+                  : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Cargar más productos'),
+                  SizedBox(width: 8),
+                  Icon(Icons.expand_more_rounded, size: 20),
+                ],
+              ),
             ),
           ),
       ],
@@ -365,7 +480,7 @@ class _Cuerpo extends ConsumerWidget {
   }
 }
 
-/// "Mostrando 24 de 57". Es lo que hace visible que la paginación funciona.
+/// Muestra cuántos productos están cargados y el total disponible.
 class _Contador extends StatelessWidget {
   const _Contador({required this.estado});
 
@@ -381,12 +496,24 @@ class _Contador extends StatelessWidget {
         : 'Mostrando $mostrados de $total';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Text(
-        texto,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.outline,
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 16,
+            color: Color(0xFF64748B),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            texto,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
             ),
+          ),
+        ],
       ),
     );
   }
@@ -402,17 +529,31 @@ class _SinResultados extends ConsumerWidget {
         estado.filtrosAplicados.hayFiltrosDeRefinamiento;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
       children: [
-        Icon(
-          Icons.search_off,
-          size: 48,
-          color: Theme.of(context).colorScheme.outline,
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: const Icon(
+            Icons.search_off_rounded,
+            size: 42,
+            color: Color(0xFF2563EB),
+          ),
         ),
-        const SizedBox(height: 16),
-        Text(
+        const SizedBox(height: 24),
+        const Text(
           'No encontramos productos',
-          style: Theme.of(context).textTheme.titleMedium,
+          style: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+            color: Color(0xFF202B3C),
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -420,16 +561,34 @@ class _SinResultados extends ConsumerWidget {
           hayRefinamientos
               ? 'Probá quitando algún filtro o buscando con otras palabras.'
               : 'Probá con otras palabras.',
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            color: Color(0xFF64748B),
+          ),
           textAlign: TextAlign.center,
         ),
         if (hayRefinamientos) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Center(
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: () => ref.read(catalogoProvider.notifier).buscar(
-                    estado.filtrosAplicados.limpiarRefinamientos(),
-                  ),
-              child: const Text('Quitar filtros'),
+                estado.filtrosAplicados.limpiarRefinamientos(),
+              ),
+              icon: const Icon(Icons.filter_alt_off_rounded, size: 18),
+              label: const Text('Quitar filtros'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF2563EB),
+                side: const BorderSide(color: Color(0xFFBFDBFE)),
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ),
         ],
