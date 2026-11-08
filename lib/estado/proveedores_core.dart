@@ -5,6 +5,7 @@ import '../core/api_client.dart';
 import '../datos/repositorios/auth_repository.dart';
 import '../datos/repositorios/carrito_repository.dart';
 import '../datos/repositorios/catalogo_repository.dart';
+import '../datos/repositorios/checkout_repository.dart';
 import '../datos/repositorios/datos_fiscales_repository.dart';
 
 /// Almacenamiento cifrado del token. Uno solo para toda la app.
@@ -27,6 +28,10 @@ final catalogoRepositoryProvider = Provider<CatalogoRepository>((ref) {
 
 final carritoRepositoryProvider = Provider<CarritoRepository>((ref) {
   return CarritoRepository(ref.watch(apiClientProvider));
+});
+
+final checkoutRepositoryProvider = Provider<CheckoutRepository>((ref) {
+  return CheckoutRepository(ref.watch(apiClientProvider));
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

@@ -10,6 +10,7 @@ import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/fila_carrito.dart';
 import '../widgets/resumen_carrito.dart';
+import 'pantalla_checkout.dart';
 import 'pantalla_inicio.dart';
 import 'pantalla_login.dart';
 import 'pantalla_producto.dart';
@@ -169,16 +170,18 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
           () => ref.read(carritoProvider.notifier).quitar(linea.id),
           exito: 'Quitamos ${linea.nombre} de tu carrito.',
         ),
-        onContinuar: _avisarCheckoutPendiente,
+        onContinuar: _irAlCheckout,
       ),
     );
   }
 
-  /// El paso 8 es el checkout. Hasta entonces el botón existe, se habilita
-  /// con `puede_comprar` y avisa: así se puede verificar que la bandera
-  /// funciona sin adelantar la etapa siguiente.
-  void _avisarCheckoutPendiente() {
-    _avisar('El checkout llega en la próxima etapa.');
+  /// Lleva a la revisión previa al pago.
+  ///
+  /// Se apila sobre el carrito, no lo reemplaza: desde el checkout se vuelve
+  /// acá para quitar un producto que bloquea la compra, y volver tiene que
+  /// ser un `pop` y no reconstruir la pantalla.
+  void _irAlCheckout() {
+    abrirCheckout(context);
   }
 
   Future<void> _confirmarVaciado() async {
