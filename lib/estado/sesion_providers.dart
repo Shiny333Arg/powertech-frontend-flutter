@@ -214,6 +214,12 @@ class SesionNotifier extends Notifier<EstadoSesion> {
   /// Cada provider nuevo del catalogo se agrega aca. Si falta uno, el sintoma
   /// es que el cliente inicia sesion y sigue viendo "Ingresá para ver el
   /// precio" hasta que cierra y reabre la app.
+  ///
+  /// **El carrito NO esta en esta lista y no es un olvido.**
+  /// `carritoProvider` depende de la sesion con `ref.watch(usuarioProvider)`,
+  /// asi que se reconstruye solo. Para datos del CLIENTE esa garantia pesa
+  /// mas que la simetria con el catalogo: olvidarse de agregarlo aca no
+  /// mostraria un precio viejo, mostraria el carrito de otra persona.
   void _invalidarCatalogo() {
     ref.invalidate(categoriasProvider);
     ref.invalidate(vitrinaProvider);

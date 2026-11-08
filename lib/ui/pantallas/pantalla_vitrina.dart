@@ -9,6 +9,7 @@ import '../../datos/modelos/vitrina.dart';
 import '../../estado/catalogo_providers.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
+import '../widgets/boton_carrito.dart';
 import '../widgets/carrusel_promociones.dart';
 import '../widgets/grilla_productos.dart';
 import 'pantalla_catalogo.dart';
@@ -45,6 +46,8 @@ class PantallaVitrina extends ConsumerWidget {
             icon: const Icon(Icons.search),
             onPressed: () => _irAlCatalogo(context),
           ),
+
+          const BotonCarrito(),
 
           IconButton(
             tooltip: 'Diagnóstico de conexión',

@@ -6,8 +6,18 @@ import 'package:dio/dio.dart';
 /// distincion importante del contrato de PowerTech:
 ///
 ///   401 en ruta autenticada  -> sesion vencida  -> hay que relogear
-///   403                      -> acceso denegado -> cuenta de gestion
+///   403 sin `codigo`         -> acceso denegado -> cuenta de gestion
 ///                               intentando entrar a la app de clientes
+///   403 codigo=email_no_     -> falta verificar -> la credencial es buena,
+///       verificado                                 falta tocar el enlace
+///                                                  del correo
+///
+/// **Los dos 403 no se pueden confundir y por eso el `codigo` se lee.** El
+/// primero es definitivo: esa cuenta no entra a la app de clientes nunca y
+/// corresponde cerrar sesion. El segundo es un paso pendiente que el usuario
+/// resuelve solo, sin volver a ingresar. Tratarlos igual le diria a un cliente
+/// recien registrado que su cuenta no sirve, que es falso y lo deja sin
+/// salida.
 ///
 /// El catalogo NUNCA da 401: con token vencido responde 200 tratando al
 /// visitante como invitado. Por eso `ErrorSesionVencida` solo puede aparecer
@@ -39,6 +49,26 @@ class ErrorSesionVencida extends ErrorApi {
 class ErrorAccesoDenegado extends ErrorApi {
   const ErrorAccesoDenegado([
     super.mensaje = 'Esta cuenta no puede usar la app de clientes.',
+  ]);
+}
+
+/// 403 con `codigo: "email_no_verificado"`.
+///
+/// Lo devuelve el middleware `api.verificado` del backend en las rutas que lo
+/// exigen: hoy el carrito, y el checkout cuando exista. Es la misma regla que
+/// `routes/web.php` aplica con `verified`.
+///
+/// **No es sesion vencida ni acceso denegado.** El token es valido y la
+/// cuenta es de tienda; lo unico que falta es que el cliente toque el enlace
+/// que le llego por correo. No hay que cerrar sesion: hay que llevarlo a la
+/// pantalla de verificacion, que ya tiene su boton de reenvio.
+///
+/// En condiciones normales la app no deberia llegar a este error: `Usuario`
+/// trae `emailVerificado` justamente para poder mostrar la pantalla correcta
+/// antes de pedir. Esto cubre el caso en que el estado local quedo viejo.
+class ErrorEmailNoVerificado extends ErrorApi {
+  const ErrorEmailNoVerificado([
+    super.mensaje = 'Necesitás confirmar tu correo para usar el carrito.',
   ]);
 }
 
@@ -141,8 +171,13 @@ ErrorApi _mapearRespuesta(Response<dynamic>? respuesta) {
   switch (codigo) {
     case 401:
       return ErrorSesionVencida(mensaje);
+    // Los dos 403 del contrato se separan por el campo `codigo`, no por el
+    // texto del mensaje. Un 403 sin `codigo` sigue cayendo donde caia antes,
+    // asi que nada de lo que ya funcionaba cambia.
     case 403:
-      return ErrorAccesoDenegado(mensaje);
+      return _codigoDe(cuerpo) == 'email_no_verificado'
+          ? ErrorEmailNoVerificado(mensaje)
+          : ErrorAccesoDenegado(mensaje);
     case 404:
       return ErrorNoEncontrado(mensaje);
     case 422:
@@ -152,6 +187,18 @@ ErrorApi _mapearRespuesta(Response<dynamic>? respuesta) {
     default:
       return ErrorServidor(mensaje, codigo);
   }
+}
+
+/// El `codigo` que algunas respuestas de error traen junto al `message`.
+///
+/// Solo lo emiten los errores que la app tiene que distinguir por algo mas
+/// que el codigo HTTP. Hoy hay uno: `email_no_verificado`.
+String? _codigoDe(dynamic cuerpo) {
+  if (cuerpo is! Map) return null;
+
+  final codigo = cuerpo['codigo'];
+
+  return codigo is String && codigo.isNotEmpty ? codigo : null;
 }
 
 /// El mensaje de Laravel para el 429 es "Too Many Attempts.", asi que no se

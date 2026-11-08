@@ -7,7 +7,9 @@ import '../../datos/modelos/producto.dart';
 import '../../datos/modelos/producto_detalle.dart';
 import '../../estado/catalogo_providers.dart';
 import '../../estado/sesion_providers.dart';
+import '../widgets/agregar_al_carrito.dart';
 import '../widgets/aviso.dart';
+import '../widgets/boton_carrito.dart';
 import '../widgets/grilla_productos.dart';
 import '../widgets/imagen_remota.dart';
 import '../widgets/lista_promociones.dart';
@@ -32,9 +34,12 @@ import 'pantalla_login.dart';
 ///    `stock_disponible <= 0`, el mismo criterio que la vitrina web.
 ///  - Precio y promociones aplicadas **solo si el backend los mandó**.
 ///
-/// **No hay botón de carrito**, y no es un olvido: la etapa 4 de la API
-/// —`POST /carrito`— todavía no existe. Un botón que no puede funcionar es
-/// peor que no tenerlo.
+/// **Desde el paso 7 hay botón de carrito.** La etapa 4 de la API
+/// —`POST /carrito`— ya existe, así que el bloque de [AgregarAlCarrito] va
+/// debajo de la disponibilidad, que es donde el cliente ya leyó si hay stock
+/// o si va en preventa. El botón cambia según el estado de sesión y no
+/// intenta llamadas que el backend va a rechazar; el detalle está en ese
+/// widget.
 /// Abre la ficha de un producto.
 ///
 /// Vive acá, junto a la pantalla que abre, porque la usan la vitrina, el
@@ -73,6 +78,7 @@ class PantallaProducto extends ConsumerWidget {
           ficha.value?.producto.nombre ?? nombre ?? 'Producto',
           overflow: TextOverflow.ellipsis,
         ),
+        actions: const [BotonCarrito()],
       ),
 
       body: SafeArea(
@@ -192,6 +198,13 @@ class _Contenido extends ConsumerWidget {
               const SizedBox(height: 18),
 
               _Disponibilidad(producto: producto),
+
+              const SizedBox(height: 16),
+
+              // Va después de la disponibilidad a propósito: el cliente ya
+              // leyó si hay stock o si va en preventa, y el botón se lo
+              // vuelve a decir en su propio texto.
+              AgregarAlCarrito(producto: producto),
 
               if (detalle.tienePromociones) ...[
                 const SizedBox(height: 18),

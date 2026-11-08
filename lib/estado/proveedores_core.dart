@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/almacenamiento.dart';
 import '../core/api_client.dart';
 import '../datos/repositorios/auth_repository.dart';
+import '../datos/repositorios/carrito_repository.dart';
 import '../datos/repositorios/catalogo_repository.dart';
 import '../datos/repositorios/datos_fiscales_repository.dart';
 
@@ -22,6 +23,10 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final catalogoRepositoryProvider = Provider<CatalogoRepository>((ref) {
   return CatalogoRepository(ref.watch(apiClientProvider));
+});
+
+final carritoRepositoryProvider = Provider<CarritoRepository>((ref) {
+  return CarritoRepository(ref.watch(apiClientProvider));
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
