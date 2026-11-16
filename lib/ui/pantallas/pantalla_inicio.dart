@@ -7,6 +7,7 @@ import '../../datos/modelos/usuario.dart';
 import '../../estado/proveedores_core.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
+import 'pantalla_compras.dart';
 
 class PantallaInicio extends ConsumerStatefulWidget {
   const PantallaInicio({super.key, required this.usuario});
@@ -85,6 +86,25 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
           children: [
             // Encabezado del perfil.
             _TarjetaPerfil(usuario: usuario),
+
+            const SizedBox(height: 16),
+
+            // Mis compras.
+            //
+            // Va arriba de los avisos de cuenta y de los datos a propósito: es
+            // la única acción de esta pantalla —el resto es informativo— y es
+            // lo que el cliente viene a buscar cuando entra a "Mi cuenta".
+            //
+            // No se condiciona a `emailVerificado`: el historial no lo exige,
+            // igual que en la web. El carrito sí, y por eso ese aviso sigue
+            // apareciendo abajo.
+            _AccesoMisCompras(
+              onTocar: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PantallaCompras(),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 
@@ -286,6 +306,84 @@ class _TarjetaPerfil extends StatelessWidget {
   }
 }
 
+
+/// Entrada a "Mis compras".
+class _AccesoMisCompras extends StatelessWidget {
+  const _AccesoMisCompras({required this.onTocar});
+
+  final VoidCallback onTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final colores = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTocar,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE8EDF3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colores.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.receipt_long_rounded,
+                  size: 21,
+                  color: colores.primary,
+                ),
+              ),
+              const SizedBox(width: 13),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mis compras',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: Color(0xFF202B3C),
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Seguí el estado de tus pedidos y mirá tus facturas.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 22,
+                color: Color(0xFFCBD5E1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _EstadoCorreo extends StatelessWidget {
   const _EstadoCorreo({required this.verificado});
