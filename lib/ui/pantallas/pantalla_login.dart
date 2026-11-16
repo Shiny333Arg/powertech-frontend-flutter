@@ -6,6 +6,7 @@ import '../../core/errores.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import '../widgets/campo_formulario.dart';
+import 'pantalla_recuperar_password.dart';
 import 'pantalla_registro.dart';
 
 class PantallaLogin extends ConsumerStatefulWidget {
@@ -69,6 +70,50 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
+  }
+
+  /// Abre el circuito de contraseña olvidada.
+  ///
+  /// **No cambia el estado de la sesión y no hay token de por medio.** Las dos
+  /// pantallas que se apilan acá encima hablan con endpoints públicos y no
+  /// escriben en `AlmacenSeguro`: mientras el cliente recupera la contraseña,
+  /// la app sigue siendo invitada y ninguna pantalla autenticada se vuelve
+  /// alcanzable. Terminado el cambio, se ingresa por acá como siempre.
+  ///
+  /// Si vuelve con un correo, la contraseña se cambió: se precarga ese correo y
+  /// se limpia la contraseña vieja, que es el equivalente de la redirección a
+  /// `login` con `status` que hace `NewPasswordController` en la web.
+  Future<void> _recuperarPassword() async {
+    final escrito = _email.text.trim();
+
+    final correoCambiado = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => PantallaRecuperarPassword(
+          emailInicial: escrito.isEmpty ? null : escrito,
+        ),
+      ),
+    );
+
+    if (correoCambiado == null || !mounted) return;
+
+    setState(() {
+      _email.text = correoCambiado;
+      _password.clear();
+      _erroresCampo = {};
+      _errorGeneral = null;
+    });
+
+    // El cartel de "tu sesión venció" ya no aporta nada: el cliente acaba de
+    // resolver por qué estaba acá.
+    ref.read(sesionProvider.notifier).descartarAviso();
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Tu contraseña fue actualizada. Ingresá con la nueva.'),
+        ),
+      );
   }
 
   // Al corregir un campo se borra su error del servidor.
@@ -222,7 +267,31 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                         ),
                       ),
 
-                      const SizedBox(height: 24),
+                      // Acceso al circuito de recuperación. Va acá, pegado al
+                      // campo de la contraseña, que es donde el cliente se da
+                      // cuenta de que no la recuerda.
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _enviando ? null : _recuperarPassword,
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF2563EB),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          child: const Text('¿Olvidaste tu contraseña?'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
 
                       SizedBox(
                         height: 52,

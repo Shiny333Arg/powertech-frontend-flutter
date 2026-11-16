@@ -6,11 +6,17 @@ import '../modelos/conversiones.dart';
 import '../modelos/sesion.dart';
 import '../modelos/usuario.dart';
 
-/// Los cinco endpoints de sesion.
+/// Los endpoints de sesion, mas los dos de contraseña olvidada.
 ///
 /// **Es el unico lugar que escribe en [AlmacenSeguro].** Ni los providers ni
 /// las pantallas tocan el token: si manana cambia donde se guarda, cambia
 /// este archivo y nada mas.
+///
+/// **Los dos metodos de recuperacion son los unicos que no tocan el
+/// almacenamiento, y es la propiedad que los define.** Estan en esta clase
+/// porque pegan a `/auth/...` y porque la pantalla de login es la que los
+/// llama, no porque participen de la sesion: no leen el token guardado, no
+/// escriben uno y no devuelven [Sesion]. Ver el bloque de mas abajo.
 class AuthRepository {
   const AuthRepository(this._api, this._almacen);
 
@@ -140,6 +146,92 @@ class AuthRepository {
     final mensaje = comoTextoOpcional(cuerpo?['message']);
 
     return mensaje ?? 'Te reenviamos el correo de verificación.';
+  }
+
+  // ------------------------------------------------------------------
+  // Contraseña olvidada
+  // ------------------------------------------------------------------
+  //
+  // Las dos rutas son PUBLICAS: quien olvido la contraseña no puede iniciar
+  // sesion, asi que no hay token que mandar. El interceptor de [ApiClient]
+  // adjunta el guardado si existe y no pasa nada: la ruta no tiene
+  // `auth:sanctum`, asi que Laravel lo ignora igual que en el catalogo.
+  //
+  // **Ninguno de los dos escribe en [AlmacenSeguro] y eso no es un olvido.**
+  // El token que viaja en `restablecerPassword` es el del correo, no un token
+  // de Sanctum: es de un solo uso, vence a los 60 minutos y no autentica
+  // ninguna otra llamada. Guardarlo seria tratar un enlace de correo como una
+  // credencial de sesion.
+  //
+  // **Tampoco inician sesion.** El backend no devuelve token ni usuario, igual
+  // que la web, que redirige al login. Cambiar la contraseña y quedar adentro
+  // son dos cosas distintas y el cliente hace la segunda escribiendola.
+
+  /// `POST /auth/password/olvide`.
+  ///
+  /// Pide el correo con el enlace de recuperacion. Devuelve el mensaje que
+  /// escribio el backend.
+  ///
+  /// **Un 200 no significa que el correo exista.** El backend contesta lo
+  /// mismo para una cuenta real, para una inexistente y para una dada de
+  /// baja: si contestara distinto, este endpoint —que es publico— serviria
+  /// para averiguar quien tiene cuenta en PowerTech. La pantalla tiene que
+  /// mostrar el mensaje tal cual y no interpretarlo como "el correo era
+  /// bueno".
+  ///
+  /// Lo que si puede fallar: [ErrorValidacion] si el correo esta mal escrito
+  /// (422 sobre el campo `email`) y [ErrorDemasiadosIntentos] si se pidio
+  /// demasiadas veces (429, `throttle:6,1`).
+  Future<String> solicitarEnlaceDeRecuperacion({required String email}) async {
+    final respuesta = await _api.enviar(
+      (dio) => dio.post<dynamic>('/auth/password/olvide', data: <String, dynamic>{
+        'email': email.trim(),
+      }),
+    );
+
+    final cuerpo = comoMapa(respuesta.data);
+
+    return comoTextoOpcional(cuerpo?['message']) ??
+        'Si el correo corresponde a una cuenta de PowerTech, te enviamos un '
+            'enlace para elegir una contraseña nueva.';
+  }
+
+  /// `POST /auth/password/restablecer`.
+  ///
+  /// Escribe la contraseña nueva usando el token del correo. Devuelve el
+  /// mensaje de confirmacion del backend.
+  ///
+  /// **El enlace invalido llega como [ErrorValidacion] sobre `email`**, no
+  /// como [ErrorSesionVencida] ni [ErrorAccesoDenegado]. Es a proposito del
+  /// backend: un 401 dispararia el circuito de relogueo de la app, y aca no
+  /// hay sesion que haya vencido. Token equivocado, token vencido, token ya
+  /// usado y correo inexistente dan todos el mismo mensaje, por el mismo
+  /// motivo que el `olvide` no distingue correos.
+  ///
+  /// Las reglas de la contraseña son las del backend (`Password::defaults()`,
+  /// hoy 8 caracteres) y un incumplimiento vuelve como 422 sobre `password`.
+  Future<String> restablecerPassword({
+    required String token,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final respuesta = await _api.enviar(
+      (dio) => dio.post<dynamic>(
+        '/auth/password/restablecer',
+        data: <String, dynamic>{
+          'token': token.trim(),
+          'email': email.trim(),
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+        },
+      ),
+    );
+
+    final cuerpo = comoMapa(respuesta.data);
+
+    return comoTextoOpcional(cuerpo?['message']) ??
+        'Listo, cambiamos tu contraseña. Ya podés ingresar con la nueva.';
   }
 
   // ------------------------------------------------------------------
