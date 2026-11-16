@@ -8,6 +8,7 @@ import '../../estado/proveedores_core.dart';
 import '../../estado/sesion_providers.dart';
 import '../widgets/aviso.dart';
 import 'pantalla_compras.dart';
+import 'pantalla_perfil.dart';
 
 class PantallaInicio extends ConsumerStatefulWidget {
   const PantallaInicio({super.key, required this.usuario});
@@ -95,13 +96,33 @@ class _PantallaInicioState extends ConsumerState<PantallaInicio> {
             // la única acción de esta pantalla —el resto es informativo— y es
             // lo que el cliente viene a buscar cuando entra a "Mi cuenta".
             //
-            // No se condiciona a `emailVerificado`: el historial no lo exige,
-            // igual que en la web. El carrito sí, y por eso ese aviso sigue
-            // apareciendo abajo.
-            _AccesoMisCompras(
+            // Ninguno de los dos se condiciona a `emailVerificado`: ni el
+            // historial ni el perfil lo exigen, igual que en la web. El
+            // carrito sí, y por eso ese aviso sigue apareciendo abajo.
+            //
+            // El perfil es, además, la salida del callejón: un cliente que se
+            // equivocó al escribir su correo al registrarse lo corrige ahí.
+            _FilaAcceso(
+              icono: Icons.receipt_long_rounded,
+              titulo: 'Mis compras',
+              detalle: 'Seguí el estado de tus pedidos y mirá tus facturas.',
               onTocar: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const PantallaCompras(),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            _FilaAcceso(
+              icono: Icons.manage_accounts_rounded,
+              titulo: 'Editar mis datos',
+              detalle: 'Cambiá tu nombre, tu correo, tus datos de '
+                  'facturación o tu contraseña.',
+              onTocar: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PantallaPerfil(),
                 ),
               ),
             ),
@@ -307,10 +328,21 @@ class _TarjetaPerfil extends StatelessWidget {
 }
 
 
-/// Entrada a "Mis compras".
-class _AccesoMisCompras extends StatelessWidget {
-  const _AccesoMisCompras({required this.onTocar});
+/// Fila de acceso a otra pantalla de la cuenta.
+///
+/// Son las únicas acciones de "Mi cuenta" —el resto de la pantalla es
+/// informativo— así que van arriba, antes de los avisos y los datos.
+class _FilaAcceso extends StatelessWidget {
+  const _FilaAcceso({
+    required this.icono,
+    required this.titulo,
+    required this.detalle,
+    required this.onTocar,
+  });
 
+  final IconData icono;
+  final String titulo;
+  final String detalle;
   final VoidCallback onTocar;
 
   @override
@@ -339,30 +371,26 @@ class _AccesoMisCompras extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: Icon(
-                  Icons.receipt_long_rounded,
-                  size: 21,
-                  color: colores.primary,
-                ),
+                child: Icon(icono, size: 21, color: colores.primary),
               ),
               const SizedBox(width: 13),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Mis compras',
-                      style: TextStyle(
+                      titulo,
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
                         color: Color(0xFF202B3C),
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
-                      'Seguí el estado de tus pedidos y mirá tus facturas.',
-                      style: TextStyle(
+                      detalle,
+                      style: const TextStyle(
                         fontSize: 12.5,
                         height: 1.4,
                         color: Color(0xFF64748B),

@@ -8,6 +8,7 @@ import '../datos/repositorios/catalogo_repository.dart';
 import '../datos/repositorios/checkout_repository.dart';
 import '../datos/repositorios/compras_repository.dart';
 import '../datos/repositorios/datos_fiscales_repository.dart';
+import '../datos/repositorios/perfil_repository.dart';
 
 /// Almacenamiento cifrado del token. Uno solo para toda la app.
 final almacenSeguroProvider = Provider<AlmacenSeguro>((ref) {
@@ -37,6 +38,10 @@ final checkoutRepositoryProvider = Provider<CheckoutRepository>((ref) {
 
 final comprasRepositoryProvider = Provider<ComprasRepository>((ref) {
   return ComprasRepository(ref.watch(apiClientProvider));
+});
+
+final perfilRepositoryProvider = Provider<PerfilRepository>((ref) {
+  return PerfilRepository(ref.watch(apiClientProvider));
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

@@ -21,6 +21,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
   final _password = TextEditingController();
 
   bool _enviando = false;
+  bool _mostrarPassword = false;
 
   // Errores por campo que devolvió Laravel en el último intento.
   Map<String, String> _erroresCampo = {};
@@ -52,7 +53,6 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
         password: _password.text,
       );
 
-      // Vuelve a la primera ruta de la pila después de iniciar sesión.
       if (mounted) {
         Navigator.of(context).popUntil((ruta) => ruta.isFirst);
       }
@@ -60,7 +60,8 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
       setState(() {
         _erroresCampo = {
           for (final campo in e.errores.keys)
-            if (e.primeroDe(campo) != null) campo: e.primeroDe(campo)!,
+            if (e.primeroDe(campo) != null)
+              campo: e.primeroDe(campo)!,
         };
       });
     } on ErrorApi catch (e) {
@@ -188,17 +189,37 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
                       const SizedBox(height: 16),
 
+                      // Contraseña con botón para mostrar u ocultar.
                       CampoFormulario(
                         controlador: _password,
                         etiqueta: 'Contraseña',
                         obligatorio: true,
-                        esPassword: true,
+                        esPassword: !_mostrarPassword,
                         habilitado: !_enviando,
                         autofill: const [AutofillHints.password],
                         accionTeclado: TextInputAction.done,
                         onEnviar: _enviando ? null : _ingresar,
                         errorServidor: _erroresCampo['password'],
                         onCambio: (_) => _limpiarError('password'),
+                        sufijo: IconButton(
+                          tooltip: _mostrarPassword
+                              ? 'Ocultar contraseña'
+                              : 'Mostrar contraseña',
+                          onPressed: _enviando
+                              ? null
+                              : () {
+                            setState(() {
+                              _mostrarPassword = !_mostrarPassword;
+                            });
+                          },
+                          icon: Icon(
+                            _mostrarPassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFF64748B),
+                            size: 21,
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: 24),

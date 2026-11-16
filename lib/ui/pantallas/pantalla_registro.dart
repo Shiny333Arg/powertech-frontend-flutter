@@ -33,6 +33,9 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
   OpcionFiscal? _condicionIva;
 
   bool _enviando = false;
+  bool _mostrarPassword = false;
+  bool _mostrarPasswordConfirmacion = false;
+
   Map<String, String> _erroresCampo = {};
   ErrorApi? _errorGeneral;
 
@@ -81,7 +84,8 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
       setState(() {
         _erroresCampo = {
           for (final campo in e.errores.keys)
-            if (e.primeroDe(campo) != null) campo: e.primeroDe(campo)!,
+            if (e.primeroDe(campo) != null)
+              campo: e.primeroDe(campo)!,
         };
       });
       _irAlPrimerError();
@@ -295,12 +299,29 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
                     controlador: _password,
                     etiqueta: 'Contraseña',
                     obligatorio: true,
-                    esPassword: true,
+                    esPassword: !_mostrarPassword,
                     habilitado: !_enviando,
                     autofill: const [AutofillHints.newPassword],
                     accionTeclado: TextInputAction.next,
                     errorServidor: _erroresCampo['password'],
                     onCambio: (_) => _limpiarError('password'),
+                    sufijo: IconButton(
+                      tooltip: _mostrarPassword
+                          ? 'Ocultar contraseña'
+                          : 'Mostrar contraseña',
+                      icon: Icon(
+                        _mostrarPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: _enviando
+                          ? null
+                          : () {
+                        setState(() {
+                          _mostrarPassword = !_mostrarPassword;
+                        });
+                      },
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -309,12 +330,30 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
                     controlador: _passwordConfirmacion,
                     etiqueta: 'Repetir contraseña',
                     obligatorio: true,
-                    esPassword: true,
+                    esPassword: !_mostrarPasswordConfirmacion,
                     habilitado: !_enviando,
                     accionTeclado: TextInputAction.next,
                     errorServidor: _erroresCampo['password_confirmation'],
                     onCambio: (_) =>
                         _limpiarError('password_confirmation'),
+                    sufijo: IconButton(
+                      tooltip: _mostrarPasswordConfirmacion
+                          ? 'Ocultar contraseña'
+                          : 'Mostrar contraseña',
+                      icon: Icon(
+                        _mostrarPasswordConfirmacion
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      onPressed: _enviando
+                          ? null
+                          : () {
+                        setState(() {
+                          _mostrarPasswordConfirmacion =
+                          !_mostrarPasswordConfirmacion;
+                        });
+                      },
+                    ),
                   ),
 
                   const SizedBox(height: 28),
@@ -409,8 +448,7 @@ class _PantallaRegistroState extends ConsumerState<PantallaRegistro> {
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor:
-                        const Color(0xFF93B4F5),
+                        disabledBackgroundColor: const Color(0xFF93B4F5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),

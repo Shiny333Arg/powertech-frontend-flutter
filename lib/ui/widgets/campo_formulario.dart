@@ -1,15 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Campo de texto que sabe mostrar el error que vino del backend.
-///
-/// La validacion que manda es la de Laravel, no la del cliente: [errorServidor]
-/// es el string que salio de `ErrorValidacion.primeroDe('campo')`. El
-/// `validator` local solo evita el viaje de ida cuando el campo esta vacio.
-///
-/// Cuando hay error del servidor y el usuario empieza a corregir, el error se
-/// borra: dejarlo pegado mientras se escribe la correccion es confuso. De eso
-/// se encarga la pantalla con [onCambio].
+// Campo de texto que muestra los errores recibidos del backend.
 class CampoFormulario extends StatelessWidget {
   const CampoFormulario({
     super.key,
@@ -27,14 +20,12 @@ class CampoFormulario extends StatelessWidget {
     this.habilitado = true,
     this.accionTeclado,
     this.onEnviar,
+    this.sufijo,
   });
 
   final TextEditingController controlador;
   final String etiqueta;
-
-  /// El mensaje que devolvio Laravel para este campo.
   final String? errorServidor;
-
   final String? ayuda;
   final bool obligatorio;
   final bool esPassword;
@@ -46,6 +37,7 @@ class CampoFormulario extends StatelessWidget {
   final bool habilitado;
   final TextInputAction? accionTeclado;
   final VoidCallback? onEnviar;
+  final Widget? sufijo;
 
   @override
   Widget build(BuildContext context) {
@@ -60,20 +52,21 @@ class CampoFormulario extends StatelessWidget {
         autofillHints: autofill,
         maxLength: largoMaximo,
         inputFormatters:
-            soloDigitos ? [FilteringTextInputFormatter.digitsOnly] : null,
+        soloDigitos ? [FilteringTextInputFormatter.digitsOnly] : null,
         onChanged: onCambio,
         onFieldSubmitted: onEnviar == null ? null : (_) => onEnviar!(),
         decoration: InputDecoration(
           labelText: etiqueta,
           border: const OutlineInputBorder(),
           helperText: ayuda,
-          // El error del servidor gana sobre el helper y sobre el contador.
           errorText: errorServidor,
           errorMaxLines: 4,
           counterText: '',
+          suffixIcon: sufijo,
         ),
         validator: (valor) {
           if (!obligatorio) return null;
+
           return (valor == null || valor.trim().isEmpty)
               ? 'Completá este campo.'
               : null;
@@ -83,8 +76,7 @@ class CampoFormulario extends StatelessWidget {
   }
 }
 
-/// Desplegable para las listas fiscales. Misma logica de error que
-/// [CampoFormulario]: el mensaje lo escribe Laravel.
+// Desplegable para las listas fiscales.
 class CampoDesplegable<T> extends StatelessWidget {
   const CampoDesplegable({
     super.key,
@@ -126,10 +118,13 @@ class CampoDesplegable<T> extends StatelessWidget {
         items: opciones
             .map(
               (opcion) => DropdownMenuItem<T>(
-                value: opcion,
-                child: Text(textoDe(opcion), overflow: TextOverflow.ellipsis),
-              ),
-            )
+            value: opcion,
+            child: Text(
+              textoDe(opcion),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        )
             .toList(),
       ),
     );
