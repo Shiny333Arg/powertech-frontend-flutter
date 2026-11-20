@@ -34,6 +34,12 @@ class AuthRepository {
   /// campo `email`, o sea como [ErrorValidacion]. No se distinguen aca ni
   /// hace falta: el backend ya escribio el mensaje que corresponde a cada
   /// uno y la pantalla lo muestra debajo del campo.
+  ///
+  /// **El cuarto de esos rechazos depende de que se mande `ambito`.** El
+  /// backend trata el campo como opcional: ausente, deriva el ambito del rol
+  /// y le emite a un empleado un token de gestion, con el que despues falla
+  /// con 403 en cada pantalla de tienda. Mandandolo, el rechazo vuelve a
+  /// ocurrir en el login, que es donde el mensaje sirve.
   Future<Sesion> iniciarSesion({
     required String email,
     required String password,
@@ -43,6 +49,11 @@ class AuthRepository {
         'email': email.trim(),
         'password': password,
         'dispositivo': nombreDelDispositivo(),
+        // Esta app es la tienda: el token tiene que salir con la ability
+        // `tienda`, que es la que exigen las rutas del carrito, el checkout y
+        // las compras. No se deriva del rol ni se configura: es lo que esta
+        // app es. El registro no lo necesita, el backend ya lo fija ahi.
+        'ambito': 'tienda',
       }),
     );
 
