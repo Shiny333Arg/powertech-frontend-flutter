@@ -216,7 +216,7 @@ Este es el comando habitual de desarrollo, con el **emulador de Android** y el b
 Para probar el **pago con Mercado Pago**, el backend tiene que estar accesible por la URL pública de ngrok. En ese caso hay que apuntar la app al túnel:
 
 ```bash
-flutter run --dart-define=API_URL_BASE=https://TUSUBDOMINIO.ngrok-free.app
+flutter run --dart-define=API_URL_BASE=https://<subdominio>.ngrok-free.dev
 ```
 
 ---
@@ -261,7 +261,7 @@ Si el backend se sirve en `127.0.0.1`, puede ser necesario levantarlo escuchando
 Con el túnel de ngrok ya levantado en el backend:
 
 ```bash
-flutter run --dart-define=API_URL_BASE=https://TUSUBDOMINIO.ngrok-free.app
+flutter run --dart-define=API_URL_BASE=https://<subdominio>.ngrok-free.dev
 ```
 
 Como ngrok sirve por HTTPS, no hay que tocar la configuración de seguridad de red. El cliente HTTP ya envía la cabecera que evita la página intersticial de aviso de ngrok.
@@ -275,7 +275,7 @@ Como ngrok sirve por HTTPS, no hay que tocar la configuración de seguridad de r
 El comando estándar de Flutter, desde la raíz del repositorio, incluyendo la URL del backend que va a usar la app compilada:
 
 ```bash
-flutter build apk --dart-define=API_URL_BASE=https://TUSUBDOMINIO.ngrok-free.app
+flutter build apk --dart-define=API_URL_BASE=https://<subdominio>.ngrok-free.dev
 ```
 
 El archivo resultante queda en `build/app/outputs/flutter-apk/app-release.apk`.
